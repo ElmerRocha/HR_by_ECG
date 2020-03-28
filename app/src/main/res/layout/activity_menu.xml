@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/fondo"
+    tools:context=".Menu">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="1dp"
+        android:layout_marginTop="1dp"
+        android:layout_marginEnd="1dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="1dp"
+            android:layout_marginTop="1dp"
+            android:layout_marginEnd="1dp"
+            android:layout_marginBottom="1dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/iv_UIS"
+                android:layout_width="212.33dp"
+                android:layout_height="102.33dp"
+                android:layout_gravity="center"
+                android:layout_marginTop="5dp"
+                android:contentDescription="@string/imagenUIS"
+                app:srcCompat="@drawable/logouis2" />
+
+            <TextView
+                android:id="@+id/titulo_Titulo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="20dp"
+                android:gravity="center"
+                android:text="@string/tituloApp"
+                android:textColor="@color/Blanco"
+                android:textSize="22sp" />
+
+            <ImageView
+                android:id="@+id/iv_ECG"
+                android:layout_width="116.67dp"
+                android:layout_height="116.67dp"
+                android:contentDescription="@string/imagenECG"
+                app:srcCompat="@drawable/ecg" />
+
+            <Button
+                android:id="@+id/btn_info"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:background="#FFFFFF"
+                android:onClick="IrInformacion"
+                android:text="@string/Introduccion" />
+
+            <Button
+                android:id="@+id/btn_inst"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="#FFFFFF"
+                android:onClick="IrInstrucciones"
+                android:text="@string/txt_btn1" />
+
+            <Button
+                android:id="@+id/button2"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="#FFFFFF"
+                android:onClick="IrGrafica"
+                android:text="@string/txt_btn2" />
+
+            <TextView
+                android:id="@+id/tv_autores"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="20dp"
+                android:gravity="center"
+                android:text="@string/autores"
+                android:textColor="@color/BlancoTransparente" />
+
+            <TextView
+                android:id="@+id/tv_ing"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:text="@string/autores_ing"
+                android:textColor="@color/BlancoTransparente" />
+
+            <TextView
+                android:id="@+id/tv_anio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:text="@string/autores_ano"
+                android:textColor="@color/BlancoTransparente" />
+
+            <ImageView
+                android:id="@+id/iv_E3T"
+                android:layout_width="200dp"
+                android:layout_height="212.33dp"
+                android:layout_marginBottom="5dp"
+                android:contentDescription="@string/imagenE3T"
+                app:srcCompat="@drawable/e3t" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</android.support.constraint.ConstraintLayout>

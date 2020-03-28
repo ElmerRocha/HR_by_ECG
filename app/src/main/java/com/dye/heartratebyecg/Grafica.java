@@ -1,0 +1,691 @@
+package com.dye.heartratebyecg;
+
+import ioio.lib.api.AnalogInput;
+import ioio.lib.api.exception.ConnectionLostException;
+import ioio.lib.util.BaseIOIOLooper;
+import ioio.lib.util.IOIOLooper;
+import ioio.lib.util.android.IOIOActivity;
+
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.pdf.PdfDocument;
+import android.net.MailTo;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.CountDownTimer;
+import android.os.Environment;
+import android.os.SystemClock;
+import android.support.design.canvas.CanvasCompat;
+import android.support.v4.content.FileProvider;
+import android.util.DisplayMetrics;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.GridLabelRenderer;
+import com.jjoe64.graphview.SecondScale;
+import com.jjoe64.graphview.Viewport;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Iterator;
+import java.util.Locale;
+
+public class Grafica extends IOIOActivity {
+
+    /*---------- Variables generales ----------*/
+    private int conteo = 1;//Conteo para promediar la variabilidad de frecuencia
+    private final int Pin_ECG=40;//Este es el pin de entrada analogico
+    private final int CantidadMuestras = 300;//Este es el numero de muestras que verá en la grafica
+    private final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
+    private final long milisegundos = 10;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    private int ejeX = 0;//Esta variable llevará el desplazamiento en eje X de la grafica
+    private int CantidadPulsos = 0;//Esta variable llevará el conteo de pulsos
+    private double lectura, promedio;//Variables para la lectura analogica, y calculo de umbral.
+    private double umbral=50;
+    private int ConteoMuestras=0;//Variable para el promedio que se lleva para calcular el umbral.
+    private int CantidadMuestrasUmbral=40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
+    private long TiempoA,TiempoB;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
+    private double RC_aprox=0;
+    /*-----------------------------------------*/
+
+    /*-------- Variables temporizador ---------*/
+    private CountDownTimer Temporizador;
+    private static final long TiempoInicialTemporizador = 30000;//60.000 milisegundos son 60 segundos.
+    private long TiempoEnMilisegundos = TiempoInicialTemporizador;
+    private boolean Temporizador_contando;//Esta variable será la bandera del temporizador
+    private boolean Graficando;//Esta variable será la bandera de la grafica
+    /*-----------------------------------------*/
+
+    /*---------- Variables de Views -----------*/
+    //Texto
+    //private TextView LecturaActual;
+    //private TextView MuestrasUmbral;
+    //private TextView ValorUmbral;
+    private TextView TextoPulsos;
+    private TextView TextoTemporizador;
+    private TextView TextoRitmoCardiaco;
+    //Botones
+    private Button BotonTemporizador;
+    private Button BotonReset;
+    private Button BotonGraficar;
+    private Button BotonGuardar;
+    //Grafica
+    private GraphView Grafica;
+    private LineGraphSeries<DataPoint> series;
+    /*-----------------------------------------*/
+    private StringBuilder Datos = new StringBuilder();
+    private int numerito = 0;
+    //private Bitmap Imagen;
+    OutputStream outputStream,outputStream2;
+    private int ConteoPDF = 1;
+
+    Bitmap Imagen;
+    Canvas Img;
+
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_grafica);
+
+        /*--- Asociar las variables de Views con las views de la GUI ---*/
+        //Texto
+        //LecturaActual = findViewById(R.id.tv_Lectura);
+        //MuestrasUmbral = findViewById(R.id.tv_MuestasUmbral);
+        //ValorUmbral = findViewById(R.id.tv_ValorUmbral);
+        TextoPulsos = findViewById(R.id.tv_Pulsos);
+        TextoTemporizador = findViewById(R.id.tv_Temporizador);
+        TextoRitmoCardiaco = findViewById(R.id.tv_RC);
+        //Botones
+        BotonTemporizador = findViewById(R.id.btn_Temporizador);
+        BotonReset = findViewById(R.id.btn_ResetTempo);
+        BotonGraficar = findViewById(R.id.btn_Graficar);
+        BotonGuardar = findViewById(R.id.boton_guardar);
+        //Grafica
+        Grafica = findViewById(R.id.grafica);
+        /*--------------------------------------------------------------*/
+
+        /*---------- GraphView y personalización de la gráfica ---------
+        ViewGroup.LayoutParams Parametros = Grafica.getLayoutParams();
+        Parametros.height = Parametros.width/2;
+        Grafica.setLayoutParams(Parametros);*/
+
+
+
+        series = new LineGraphSeries<DataPoint>();
+        Grafica.addSeries(series);
+
+        Viewport Grid = Grafica.getViewport();
+        GridLabelRenderer Label = Grafica.getGridLabelRenderer();
+        Label.setGridColor(getResources().getColor(R.color.GrisOscuro));
+        Grid.setDrawBorder(true);
+
+
+
+        Grid.setXAxisBoundsManual(true);
+        Grid.setYAxisBoundsManual(true);
+        Grid.setMinX(0.0001);
+        Grid.setMinY(0.0001);
+        Grid.setMaxX(CantidadMuestras);
+        Grid.setMaxY(multiplicador);
+        Grid.setScrollable(false);
+
+
+        Label.setNumHorizontalLabels(CantidadMuestras);
+        Label.setNumVerticalLabels(multiplicador);
+        Label.setVerticalLabelsVisible(false);
+        Label.setHorizontalLabelsVisible(false);
+
+        Label.reloadStyles();
+
+        /*Viewport viewport = Grafica.getViewport();
+        viewport.setXAxisBoundsManual(true);
+        viewport.setYAxisBoundsManual(true);
+        viewport.setMinX(0);
+        viewport.setMinY(0);
+        viewport.setMaxX(CantidadMuestras);
+        viewport.setMaxY(multiplicador);
+        viewport.setScrollable(false);
+        Grafica.getGridLabelRenderer().setNumHorizontalLabels(CantidadMuestras);
+        Grafica.getGridLabelRenderer().setNumVerticalLabels(multiplicador);
+        Grafica.getGridLabelRenderer().setHorizontalLabelsVisible(false);
+        Grafica.getGridLabelRenderer().setVerticalLabelsVisible(false);
+        //Grafica.getGridLabelRenderer().setHumanRounding(true);*/
+        /*--------------------------------------------------------------*/
+
+        //Datos.append("Tiempo,Muestra");
+
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
+
+        //Iniciar el temporizador
+        actualizarTextoTemporizador();
+    }//Cierra onCreate
+
+    /**
+     * Este es el hilo en el que ocurre toda la actividad IOIO. Se ejecutará
+     * cada vez que la aplicación se reanuda y se cancela cuando se detiene.
+     * Lo que esté en método setup() se llamará inmediatamente después de que se haya establecido una conexión con IOIO
+     * Esto puede suceder varias veces. Entonces, loop() será llamada repetidamente hasta que el IOIO se desconecte.
+     * Igual que en Arduino.
+     */
+    class Looper extends BaseIOIOLooper {
+        private AnalogInput EntradaAnalogica;
+
+        /**
+         * Se llama cada vez que se establece una conexión con IOIO.
+         * Normalmente se usa para abrir pines.
+         * Se lanza ConnectionLostException cuando se pierde la conexión IOIO.
+         */
+        @Override
+        protected void setup() throws ConnectionLostException {
+            toast("¡IOIO se ha conectado!");
+            try {
+                EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
+            } catch (ConnectionLostException e) {
+                ioio_.disconnect();
+                throw e;
+            }
+        }//Cierre setup
+
+        private long T1, T2;
+        private double RC_prom=0;
+        private double RC_temp;
+        int cant = 10;
+
+        private int Num=1;
+        private int TiempoInicial=0;
+        private int TiempoFinal;
+        /**
+         * Llamado repetidamente mientras el IOIO está conectado.
+         * En este método se programa lo que quiere que la tarjeta haga durante su ejecución.
+         * Lanza ConnectionLostException cuando se pierde la conexión IOIO.
+         * Lanza InterruptedException cuando el hilo IOIO ha sido interrumpido.
+         */
+        @Override
+        public void loop() throws ConnectionLostException, InterruptedException {
+
+            try {
+                if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
+                    lectura = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
+                    umbral = promedioUmbral(lectura);
+
+                    if(lectura > umbral) {
+                        T1 = T2;
+                        T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
+
+                        if ((T2-T1)>400) {//400 ms porque es el promedio de duración del segmento QT
+                            TiempoA = TiempoB;
+                            TiempoB = SystemClock.elapsedRealtime();
+                            RC_temp = 60.0 / ((TiempoB - TiempoA) / 1000.0);//Se divide en 1k para que la medida quede en segundos.
+                            RC_prom = RC_prom + RC_temp;
+                            if(conteo>=cant) {
+                                RC_aprox = RC_prom / cant;
+                                conteo = 1;
+                                RC_prom = 0;
+                            } else {
+                                conteo++;
+                            }
+
+                            if (Temporizador_contando) {
+                                CantidadPulsos++;
+                            }
+                        }
+                    }//If(lectura>umbral)
+
+                    /*if( (ConteoPDF >= Num*CantidadMuestras) || (ConteoPDF == 20090805) ) {
+                        TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
+                        AgregarDatosPDF(TiempoInicial,TiempoFinal);
+                        TiempoInicial=TiempoFinal;
+                        Num++;
+
+                        if(ConteoPDF == 20090805) {
+                            Graficando=false;
+                            ConteoPDF=0;
+
+                            BotonGuardar.setVisibility(View.VISIBLE);
+                        }
+                    }*/
+
+
+                    actualizarTextoGrafica(CantidadPulsos,RC_aprox);
+                    agregarEntradaGrafica(lectura);
+                    Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
+                }//If(graficando)
+
+            } catch (InterruptedException e) {
+                ioio_.disconnect();
+                throw e;
+            } catch (ConnectionLostException e) {
+                throw e;
+            }
+        }//Cierre loop
+
+
+        //Método para mostrar cuando se deconecta IOIO
+        @Override
+        public void disconnected() {
+            toast("¡IOIO se ha desconectado!");
+            EntradaAnalogica.close();
+        }
+
+    }//Cierra Looper
+
+    /**--------------------------------------------------------------------------
+     * ---------------------------- Métodos de IOIO -----------------------------
+     * --------------------------------------------------------------------------*/
+    @Override//El metodo para crear el hilo IOIO
+    protected IOIOLooper createIOIOLooper() {
+        return new Looper();
+    }
+    //Metodo para imprimir mensajes en el celular tipo Toast, emergente.
+    private void toast(final String mensaje) {
+        final Context contexto = this;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+    /*--------------------------------------------------------------------------*/
+
+    /*----------------------------- Métodos de botones --------------------------*/
+    public void BtnGraficar(View view) {
+        if(Graficando) {
+            Graficando = false;
+            BotonGraficar.setText("Graficar");
+        } else {
+            Graficando = true;
+            BotonGraficar.setText("Parar gráfica");
+        }
+    }
+    public void BtnContarPulsos(View view) {
+        if (Temporizador_contando) {
+            pausarTemporizador();
+        } else {
+            empezarTemporizador();
+        }
+
+    }
+    public void BtnResetTempo(View view) {
+        resetTemporizador();
+    }
+    /*---------------------------------------------------------------------------*/
+
+    /*------------------------ Métodos de temporizador --------------------------*/
+    private void empezarTemporizador() {
+        Temporizador = new CountDownTimer(TiempoEnMilisegundos, 1000) {//1000 milisegundos = 1 segundo.
+            @Override
+            public void onTick(long tiempo) {
+                if (TiempoEnMilisegundos == TiempoInicialTemporizador) CantidadPulsos=0;
+                TiempoEnMilisegundos = tiempo;
+                actualizarTextoTemporizador();
+            }
+
+            @Override
+            public void onFinish() {
+                Temporizador_contando = false;
+                BotonTemporizador.setText("Contar pulsos");
+                BotonTemporizador.setVisibility(View.INVISIBLE);
+                BotonReset.setVisibility(View.VISIBLE);
+
+                ConteoPDF = 20090805;
+            }
+        }.start();
+
+        Temporizador_contando=true;
+        //TerminarPagina=false;
+        BotonTemporizador.setText("Pausar conteo");
+        BotonReset.setVisibility(View.INVISIBLE);
+    }
+    private void pausarTemporizador() {
+        Temporizador.cancel();
+        Temporizador_contando = false;
+        BotonTemporizador.setText("Reanudar conteo");
+        BotonReset.setVisibility(View.VISIBLE);
+    }
+    private void resetTemporizador() {
+        TiempoEnMilisegundos = TiempoInicialTemporizador;
+        BotonTemporizador.setText("Contar pulsos");
+        BotonReset.setVisibility(View.INVISIBLE);
+        BotonTemporizador.setVisibility(View.VISIBLE);
+        actualizarTextoTemporizador();
+
+        BotonGuardar.setVisibility(View.INVISIBLE);
+        Datos.delete(0,Datos.length());
+        numerito=0;
+        Datos.append("Tiempo,Muestra");
+    }
+    private void actualizarTextoTemporizador() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                int segundos = (int) TiempoEnMilisegundos / 1000;
+                String tiempo = String.format(Locale.getDefault(),"%02d", segundos)+" s";
+                if (segundos<10) tiempo = String.format(Locale.getDefault(),"%01d", segundos)+" s";
+                TextoTemporizador.setText(tiempo);
+            }
+        });
+
+    }
+    /*---------------------------------------------------------------------------*/
+
+    /*-------------------------- Método de umbral -------------------------------*/
+    private double promedioUmbral(double lectura) {
+        //Ciclo para calcular el umbral
+        if (ConteoMuestras < CantidadMuestrasUmbral) {
+            promedio = promedio + lectura;
+            ConteoMuestras++;
+        } else {
+            umbral = 1.2*(promedio/CantidadMuestrasUmbral);
+            promedio=0;
+            ConteoMuestras=0;
+        }
+        return umbral;
+    }
+    /*---------------------------------------------------------------------------*/
+
+    /*------------------------ Métodos de Gráfica -------------------------------*/
+    private void agregarEntradaGrafica(final double datoEntrada) {//Metodo para agregar datos a GraphView
+        //Se elige mostar maximo # puntos en el Viewpoint y que haga scroll hasta el final
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                series.appendData(new DataPoint(ejeX++, datoEntrada), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
+                //if(Temporizador_contando) Datos.append("\n" + numerito++ + "," + String.format(Locale.getDefault(),"%.2f",datoEntrada));
+                if(Temporizador_contando) ConteoPDF++;
+            }
+        });
+
+    }
+    private void actualizarTextoGrafica(int pulsos, double rc) {
+        final String v1 = pulsos+" bpm";
+        final String v2 = (int)rc + " bpm";//Se hace un cast de RC para convertirlo en entero.
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                TextoPulsos.setText(v1);
+                TextoRitmoCardiaco.setText(v2);
+            }
+        });
+
+    }
+    /*---------------------------------------------------------------------------*/
+
+    /*-------------------- Compartir el CSV-----------------------*/
+    /*public void ExportarCSV(View view) throws IOException {
+
+        //Imagen = getViewBitmap(Grafica);
+
+        Imagen = Bitmap.createBitmap(Grafica.getWidth(),Grafica.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(Imagen);
+        Grafica.draw(canvas);
+
+        File filepath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        File dir = new File(filepath.getAbsolutePath()+"/Coco/");
+        dir.mkdir();
+        File file = new File(dir,"Cocos.jpg");
+        File file2 = new File(dir,"datos.csv");
+        try {
+            outputStream = new FileOutputStream(file);
+            outputStream2 = new FileOutputStream(file2);
+
+            Imagen.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+            outputStream2.write((Datos.toString()).getBytes());
+
+            outputStream.flush();
+            //outputStream2.flush();
+            outputStream.close();
+            outputStream2.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+
+        }
+        toast("Imagen y archivo csv en "+dir.getAbsolutePath());
+
+
+        try{
+
+            //Guardar el archivo en el dispositivo
+            FileOutputStream out = openFileOutput("data.csv", Context.MODE_PRIVATE);
+            out.write((Datos.toString()).getBytes());
+            out.close();
+
+            //Exportando - Compartiendo
+            Context context = getApplicationContext();
+            File filelocation = new File(getFilesDir(), "data.csv");
+            Uri path = FileProvider.getUriForFile(context, "com.dye.heartratebyecg.fileprovider", filelocation);
+            Intent fileIntent = new Intent(Intent.ACTION_SEND);
+            fileIntent.setType("text/csv");
+            fileIntent.putExtra(Intent.EXTRA_SUBJECT, "Data");
+            fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            fileIntent.putExtra(Intent.EXTRA_STREAM, path);
+            startActivity(Intent.createChooser(fileIntent, "Guardar y compartir"));
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
+
+        BotonGuardar.setVisibility(View.INVISIBLE);
+    }*/
+    /*---------------------------------------------------------------------------*/
+    /*public Bitmap getResizedBitmap(Bitmap bm) {
+        float scaleWidth = ((float) bm.getWidth()/2);
+        float scaleHeight = ((float) bm.getHeight()/2);
+        // CREATE A MATRIX FOR THE MANIPULATION
+        Matrix matrix = new Matrix();
+        // RESIZE THE BIT MAP
+        matrix.postScale(scaleWidth, scaleHeight);
+
+        // "RECREATE" THE NEW BITMAP
+        Bitmap resizedBitmap = Bitmap.createBitmap(bm, 0, 0, (int)bm.getWidth()/2, (int)bm.getHeight()/2, matrix, false);
+        //bm.recycle();
+        return resizedBitmap;
+    }*/
+    public void PDF(View view) throws IOException {
+        //Crear un nuevo documento
+        PdfDocument document = new PdfDocument();
+
+        // Crear un page description
+        //Las medidas son porque se utiliza el lenguaje PostScript que usa 1/72 de pulgada para las medidas
+        //Y el tamaño estandar Letter(carta) es de dimensiones 8.5x11'' por lo tanto 8.5*72=612 y 11*72=792
+        //PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(612, 792, 1).create();
+        //El formato A4 es 8.27 × 11.69 -> en P.S. es 595x842
+        //0.984252
+        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
+        //Empezar Documento
+        PdfDocument.Page page = document.startPage(pageInfo);//page, pagina 1
+        Canvas canvas = page.getCanvas();
+
+        //Imagen
+        int ImgWidth = Grafica.getWidth();
+        int ImgHeight = Grafica.getHeight();
+
+        int margen=36;
+
+
+
+        Imagen = Bitmap.createBitmap(ImgWidth, ImgHeight, Bitmap.Config.ARGB_8888);
+        //Imagen.setDensity(DisplayMetrics.DENSITY_XHIGH);
+        Canvas Img = new Canvas(Imagen);
+        Imagen.setDensity(DisplayMetrics.DENSITY_XHIGH);
+        Img.setDensity(DisplayMetrics.DENSITY_XHIGH);
+        //int dens = Img.getDensity();
+        //Img.setDensity(DisplayMetrics.DENSITY_XHIGH);
+        Grafica.draw(Img);
+        Grafica.refreshDrawableState();
+        Grafica.invalidate();
+        //Redimensionar
+        final int redFactor = 3;
+        final int redImgWidth = Grafica.getWidth()/redFactor;
+        final int redImgHeight = Grafica.getHeight()/redFactor;
+
+
+        Paint rojo = new Paint();rojo.setColor(Color.RED);
+        Paint azul = new Paint();azul.setColor(Color.BLUE);
+        canvas.drawText("Hola mundo, probando.", 36, margen, rojo);
+        margen+=2;
+        Rect dstRect = new Rect(33, margen, redImgWidth, redImgHeight);
+        margen+=redImgHeight;
+        //canvas.drawBitmap(Imagen, null,dstRect, new Paint());
+        canvas.drawBitmap(Imagen, null, dstRect, new Paint());
+        canvas.drawText("Adiós mundo, probando.", 36, margen-30, azul);
+        margen+=2;
+        //Imagen.recycle();
+        Bitmap Imagen2 = Bitmap.createBitmap(ImgWidth, ImgHeight, Bitmap.Config.ARGB_8888);
+        Imagen2.setDensity(DisplayMetrics.DENSITY_XHIGH);
+        Canvas Img2 = new Canvas(Imagen2);
+        Img2.setDensity(DisplayMetrics.DENSITY_XHIGH);
+        Grafica.draw(Img2);
+
+        canvas.drawBitmap(Imagen2, null,new Rect(33, margen, redImgWidth, redImgHeight), new Paint());
+        margen+=redImgHeight;
+        canvas.drawText("Espero que la grafica aparezca arriba", 36, margen-30, azul);
+        //Imagen2.recycle();
+
+        document.finishPage(page);
+
+        File filepath = Environment.getExternalStorageDirectory();
+        File dir = new File(filepath.getAbsolutePath() + "/PDF/");
+        if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
+        File file = new File(dir, "Prueba.pdf");
+
+        try {
+            outputStream = new FileOutputStream(file);
+            document.writeTo(outputStream);
+            document.close();
+            outputStream.flush();
+            outputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+
+        toast("Ducumento guardado en "+dir.getAbsolutePath()+" como "+file.getName());
+        BotonGuardar.setVisibility(View.INVISIBLE);
+
+    }
+    /*------------ Metodos de creación y exportación del documento --------------*/
+    //Crear el documento pdf
+    /*private PdfDocument document = new PdfDocument();
+    private boolean CrearPagina=true;
+    private boolean TerminarPagina=false;
+    private PdfDocument.PageInfo pageInfo;
+    private PdfDocument.Page page;
+    private Canvas PaginaCanvas;
+    private int EspacioTexto;
+    private int NumPagina=1;
+    private int MargenExterno = 71;//Margen de 2.5 cm = 0.984252'' = 71 P.S.
+    private int MargenLateral = 85;//Margen de 3.0 cm = 1.1811'' = 85 P.S.
+    private int pageWidth = 595;
+    private int pageHeight = 842;
+    private Paint ColorNegro = new Paint();
+    RectF dstRect;
+
+
+
+    private void AgregarDatosPDF(final int A, final int B) {
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+
+                //Obtener imagen
+                Imagen = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
+                Img = new Canvas(Imagen);
+                Grafica.draw(Img);
+
+                //Redimensionar imagen
+                final int redFactor = 3;
+                final int redImgWidth = Imagen.getWidth()/redFactor;
+                final int redImgHeight = Imagen.getHeight()/redFactor;
+
+                //Texto para agregar
+                String tmpTxt = A+"-"+B+" s:";
+
+                if ( (EspacioTexto+redImgHeight) > (pageHeight-MargenExterno) ) {
+                    CrearPagina=true;
+                    NumPagina++;
+                    document.finishPage(page);
+                }
+
+
+                if (CrearPagina) {
+                    // Crear un page description
+                    //El formato A4 es 8.27 × 11.69 -> en P.S. es 595x842
+                    pageInfo = new PdfDocument.PageInfo.Builder(pageWidth,pageHeight, NumPagina).create();
+                    //Empezar Documento
+                    page = document.startPage(pageInfo);//page,
+                    PaginaCanvas = page.getCanvas();
+                    EspacioTexto = MargenExterno;
+                    ColorNegro.setColor(Color.BLACK);//Color Negro
+                    CrearPagina = false;
+                }
+
+                //Agregar texto
+                PaginaCanvas.drawText(tmpTxt, MargenLateral, EspacioTexto, ColorNegro);
+                EspacioTexto+=1;
+                //Agregar imagen
+                dstRect = new RectF(MargenLateral, EspacioTexto, redImgWidth, redImgHeight);
+                PaginaCanvas.drawBitmap(Imagen, null,dstRect, new Paint());
+                EspacioTexto = EspacioTexto + redImgHeight-20;
+
+                //Imagen.recycle();
+                //Img.drawColor(Color.WHITE);
+
+            }//Run
+        });//Runnable
+
+
+
+    }//AgregarDatosPDF
+    public void PDF(View view) {
+        document.finishPage(page);
+
+        File filepath = Environment.getExternalStorageDirectory();
+        File dir = new File(filepath.getAbsolutePath() + "/PDF/");
+        if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
+        File file = new File(dir, "ECG_"+System.currentTimeMillis()+".pdf");
+
+        try {
+            outputStream = new FileOutputStream(file);
+            document.writeTo(outputStream);
+            document.close();
+            outputStream.flush();
+            outputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+
+        toast("Ducumento guardado en "+dir.getAbsolutePath()+" como "+file.getName());
+        BotonGuardar.setVisibility(View.INVISIBLE);
+    }*/
+
+    /*---------------------------------------------------------------------------*/
+
+
+}//Cierra Grafica
+

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#005bd0</color>
+    <color name="colorPrimaryDark">#0c377b</color>
+    <color name="colorAccent">#D81B60</color>
+    <!-- Fondo -->
+    <color name="AzulOscuro">#0c377b</color>
+    <color name="AzulClaro">#005bd0</color>
+    <!-- Bolitas de instrucciones -->
+    <color name="BlancoTransparente">#CCCCCC</color>
+    <color name="Blanco">#FFFFFF</color>
+    <color name="Negro">#000000</color>
+    <color name="GrisOscuro">#444444</color>
+</resources>

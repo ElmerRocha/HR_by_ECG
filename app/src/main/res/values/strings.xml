@@ -1,0 +1,78 @@
+<resources>
+    <!-- Menu Activity -->
+    <string name="app_name">Heart Rate by ECG</string>
+    <string name="tituloApp">Heart rate by ECG signal</string>
+    <string name="imagenUIS">Logo UIS</string>
+    <string name="imagenECG">ECG Signal</string>
+    <string name="imagenE3T">Logo E3T</string>
+    <string name="txt_btn1">Instrucciones</string>
+    <string name="txt_btn2">Gráfica</string>
+    <string name="autores">Daniela Gelvez y Elmer Rocha</string>
+    <string name="autores_ing">Ingeniería Electrónica</string>
+    <string name="autores_ano">2020</string>
+
+    <!-- Grafica Activity -->
+    <string name="txt_1">Gráfica</string>
+    <string name="txt_2">0</string>
+    <string name="txt_3">0 bpm</string>
+    <string name="txt_4">60 s</string>
+    <string name="txt_5">0</string>
+    <string name="txt_6">0 bpm</string>
+    <string name="txt_btn">Contar pulsos</string>
+    <string name="txt_btnReset">Reiniciar conteo</string>
+    <string name="tboton">Graficar</string>
+    <string name="txt_i">0</string>
+    <string name="titulo1">Lectura actual</string>
+    <string name="titulo2">Valor de Umbral</string>
+    <string name="titulo3">Pulsos contados</string>
+    <string name="titulo4">Muestras umbral</string>
+    <string name="titulo7">Ritmo cardiaco aprox.</string>
+    <string name="titulo5">Parar gráfica</string>
+    <string name="titulo6">Segundos</string>
+    <string name="BotonCSV">Guardar PDF</string>
+
+    <!-- Fragments -->
+    <string name="title_activity_instrucciones">Instrucciones</string>
+    <string name="hello_blank_fragment2">Heart rate by ECG signal</string>
+    <string name="f1">Primer paso</string>
+    <string name="f2">Segundo paso</string>
+    <string name="f3">Tercer paso</string>
+    <string name="f4">Cuarto paso</string>
+    <string name="p1">Conecte los cables a los electrodos, verifique que los electrodos se encuentren en buen estado, al no ser así cambie por otros.</string>
+    <string name="p2">Coloque los electrodos en el cuerpo de acuerdo con la figura. Preste con atención los colores, ubiquelo bajo la clavícula del hombro derecho (rojo), bajo la clavícula del hombro izquierdo (amarillo) y en el abdomen inferior derecho (verde). Antes de colocarlos revise que la zona este limpia.</string>
+    <string name="p3">Luego de colocarse los electrodos introduzca el plug al jack en la tarjeta ECG. Esta tarjeta le mide la frecuencia cardiaca. </string>
+    <string name="p4">Conecte el cable USB OTG a la tarjeta y al celular, luego verifique que el dispositivo esté conectado. Cuando todo esté conectado accione el switch, este le permite desconectar o encender todo el dispositivo. Dirijase al menú principal y  oprima el botón Gráfica.</string>
+    <string name="tab_text_1">Tab 1</string>
+    <string name="tab_text_2">Tab 2</string>
+
+
+    <!-- Información -->
+    <string name="Introduccion">Información</string>
+    <string name="induccion1">Las actividades eléctricas del corazón se pueden observar en forma de un electrocardiograma (ECG) a través de electrodos en el cuerpo. Las derivaciones I, II y III son derivaciones bipolares introducidas por Einthoven y miden el potencial eléctrico entre dos electrodos. La I derivación se ubica entre el hombro derecho, polo negativo, el hombro izquierdo, polo positivo y abdomen derecho, polo a tierra, esta derivación observa la cara lateral alta del corazón</string>
+    <string name="induccion2">a un ángulo de 0°.</string>
+    <string name="onda">Un latido cardíaco normal consiste en una onda P, un </string>
+    <string name="onda2">complejo QRS y una onda T.</string>
+    <string name="lectura2">-Onda P: Representa la despolarización auricular.</string>
+    <string name="Imagen1">Onda ECG</string>
+    <string name="lectura3">-Complejo QRS: Es la combinación de la repolarización  </string>
+    <string name="lectura3_1">auricular y la despolarización ventricular.</string>
+    <string name="lectura4">-Onda T: Representa la repolarización ventricular.</string>
+    <string name="lectura5">-Onda U: Normalmente es invisible y se consideran potenciales ventriculares. </string>
+    <string name="lectura6">El ECG determina si el corazón funciona normalmente o sufre de alguna anomalía. En la siguiente tabla se</string>
+    <string name="lectura6_1">observa la frecuencia cardiaca en reposo.</string>
+    <string name="columna1">Edad</string>
+    <string name="columna2">Frecuencia normal (bpm)</string>
+    <string name="fila2">Niños 1-2 años </string>
+    <string name="fila2_1">80-130</string>
+    <string name="fila3">Niños 7-9 años </string>
+    <string name="fila3_1">70-110</string>
+    <string name="fila4">Adultos</string>
+    <string name="fila4_1">60-110</string>
+    <string name="fila5">Adulto Atleta</string>
+    <string name="fila5_1">40-60</string>
+    <string name="lectura7">Recuerde que varios factores pueden influir en la medición de la frecuencia cardíaca.</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+</resources>
