@@ -152,9 +152,9 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:gravity="center"
-                android:onClick="PDF"
+                android:onClick="GuardarPDF"
                 android:text="@string/BotonCSV"
-                android:visibility="visible"
+                android:visibility="invisible"
                 tools:visibility="visible" />
 
         </LinearLayout>

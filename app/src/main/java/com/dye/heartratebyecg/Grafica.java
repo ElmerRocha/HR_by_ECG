@@ -6,8 +6,10 @@ import ioio.lib.util.BaseIOIOLooper;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -17,6 +19,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.pdf.PdfDocument;
 import android.net.MailTo;
 import android.net.Uri;
@@ -25,6 +28,7 @@ import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.support.design.canvas.CanvasCompat;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.util.DisplayMetrics;
 import android.view.View;
@@ -108,6 +112,18 @@ public class Grafica extends IOIOActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_grafica);
 
+        // Permisos
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},1000);
+        }
+        if( ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE},1000);
+        }
+        if( ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH},1000);
+        }
+
+
         /*--- Asociar las variables de Views con las views de la GUI ---*/
         //Texto
         //LecturaActual = findViewById(R.id.tv_Lectura);
@@ -174,7 +190,7 @@ public class Grafica extends IOIOActivity {
         /*--------------------------------------------------------------*/
 
         //Datos.append("Tiempo,Muestra");
-
+        //Aceleracion de Hardware para la gráfica
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
 
@@ -253,25 +269,27 @@ public class Grafica extends IOIOActivity {
                         }
                     }//If(lectura>umbral)
 
-                    /*if( (ConteoPDF >= Num*CantidadMuestras) || (ConteoPDF == 20090805) ) {
+                    if(ConteoPDF >= Num*CantidadMuestras) {
                         TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
                         AgregarDatosPDF(TiempoInicial,TiempoFinal);
                         TiempoInicial=TiempoFinal;
                         Num++;
-
-                        if(ConteoPDF == 20090805) {
-                            Graficando=false;
-                            ConteoPDF=0;
-
-                            BotonGuardar.setVisibility(View.VISIBLE);
-                        }
-                    }*/
-
+                    }
 
                     actualizarTextoGrafica(CantidadPulsos,RC_aprox);
                     agregarEntradaGrafica(lectura);
                     Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
                 }//If(graficando)
+
+                if(ConteoPDF == 20090805) {
+                    TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
+                    AgregarDatosPDF(TiempoInicial,TiempoFinal);
+                    TiempoInicial=TiempoFinal;
+
+                    Graficando=false;
+                    ConteoPDF=0;
+                    BotonGuardar.setVisibility(View.VISIBLE);
+                }
 
             } catch (InterruptedException e) {
                 ioio_.disconnect();
@@ -349,13 +367,11 @@ public class Grafica extends IOIOActivity {
                 BotonTemporizador.setText("Contar pulsos");
                 BotonTemporizador.setVisibility(View.INVISIBLE);
                 BotonReset.setVisibility(View.VISIBLE);
-
                 ConteoPDF = 20090805;
             }
         }.start();
 
         Temporizador_contando=true;
-        //TerminarPagina=false;
         BotonTemporizador.setText("Pausar conteo");
         BotonReset.setVisibility(View.INVISIBLE);
     }
@@ -373,9 +389,6 @@ public class Grafica extends IOIOActivity {
         actualizarTextoTemporizador();
 
         BotonGuardar.setVisibility(View.INVISIBLE);
-        Datos.delete(0,Datos.length());
-        numerito=0;
-        Datos.append("Tiempo,Muestra");
     }
     private void actualizarTextoTemporizador() {
         runOnUiThread(new Runnable() {
@@ -413,7 +426,6 @@ public class Grafica extends IOIOActivity {
             @Override
             public void run() {
                 series.appendData(new DataPoint(ejeX++, datoEntrada), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
-                //if(Temporizador_contando) Datos.append("\n" + numerito++ + "," + String.format(Locale.getDefault(),"%.2f",datoEntrada));
                 if(Temporizador_contando) ConteoPDF++;
             }
         });
@@ -490,80 +502,44 @@ public class Grafica extends IOIOActivity {
 
         BotonGuardar.setVisibility(View.INVISIBLE);
     }*/
-    /*---------------------------------------------------------------------------*/
-    /*public Bitmap getResizedBitmap(Bitmap bm) {
-        float scaleWidth = ((float) bm.getWidth()/2);
-        float scaleHeight = ((float) bm.getHeight()/2);
-        // CREATE A MATRIX FOR THE MANIPULATION
-        Matrix matrix = new Matrix();
-        // RESIZE THE BIT MAP
-        matrix.postScale(scaleWidth, scaleHeight);
-
-        // "RECREATE" THE NEW BITMAP
-        Bitmap resizedBitmap = Bitmap.createBitmap(bm, 0, 0, (int)bm.getWidth()/2, (int)bm.getHeight()/2, matrix, false);
-        //bm.recycle();
-        return resizedBitmap;
-    }*/
-    public void PDF(View view) throws IOException {
+    /*------------------ Metodos de prueba para guadar PDF ----------------------*/
+    /*public void PDF(View view) throws IOException {
         //Crear un nuevo documento
         PdfDocument document = new PdfDocument();
 
         // Crear un page description
         //Las medidas son porque se utiliza el lenguaje PostScript que usa 1/72 de pulgada para las medidas
-        //Y el tamaño estandar Letter(carta) es de dimensiones 8.5x11'' por lo tanto 8.5*72=612 y 11*72=792
-        //PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(612, 792, 1).create();
         //El formato A4 es 8.27 × 11.69 -> en P.S. es 595x842
-        //0.984252
         PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
         //Empezar Documento
-        PdfDocument.Page page = document.startPage(pageInfo);//page, pagina 1
-        Canvas canvas = page.getCanvas();
+        PdfDocument.Page page = document.startPage(pageInfo);//Página 1
+        Canvas canvas = page.getCanvas();//Se obtiene la pagina en canvas para mapearla como una imagen
 
-        //Imagen
-        int ImgWidth = Grafica.getWidth();
-        int ImgHeight = Grafica.getHeight();
+        int margen=45;
+        int mIzq = 40;
+        int Altura = 232;
 
-        int margen=36;
+        Paint negro = new Paint();negro.setColor(Color.BLACK);
 
-
-
-        Imagen = Bitmap.createBitmap(ImgWidth, ImgHeight, Bitmap.Config.ARGB_8888);
-        //Imagen.setDensity(DisplayMetrics.DENSITY_XHIGH);
-        Canvas Img = new Canvas(Imagen);
-        Imagen.setDensity(DisplayMetrics.DENSITY_XHIGH);
-        Img.setDensity(DisplayMetrics.DENSITY_XHIGH);
-        //int dens = Img.getDensity();
-        //Img.setDensity(DisplayMetrics.DENSITY_XHIGH);
-        Grafica.draw(Img);
-        Grafica.refreshDrawableState();
-        Grafica.invalidate();
-        //Redimensionar
-        final int redFactor = 3;
-        final int redImgWidth = Grafica.getWidth()/redFactor;
-        final int redImgHeight = Grafica.getHeight()/redFactor;
-
-
-        Paint rojo = new Paint();rojo.setColor(Color.RED);
-        Paint azul = new Paint();azul.setColor(Color.BLUE);
-        canvas.drawText("Hola mundo, probando.", 36, margen, rojo);
+        canvas.drawText("Daniela hizo posible esto",mIzq,margen,negro);
         margen+=2;
-        Rect dstRect = new Rect(33, margen, redImgWidth, redImgHeight);
-        margen+=redImgHeight;
-        //canvas.drawBitmap(Imagen, null,dstRect, new Paint());
-        canvas.drawBitmap(Imagen, null, dstRect, new Paint());
-        canvas.drawText("Adiós mundo, probando.", 36, margen-30, azul);
-        margen+=2;
-        //Imagen.recycle();
-        Bitmap Imagen2 = Bitmap.createBitmap(ImgWidth, ImgHeight, Bitmap.Config.ARGB_8888);
-        Imagen2.setDensity(DisplayMetrics.DENSITY_XHIGH);
-        Canvas Img2 = new Canvas(Imagen2);
-        Img2.setDensity(DisplayMetrics.DENSITY_XHIGH);
-        Grafica.draw(Img2);
 
-        canvas.drawBitmap(Imagen2, null,new Rect(33, margen, redImgWidth, redImgHeight), new Paint());
-        margen+=redImgHeight;
-        canvas.drawText("Espero que la grafica aparezca arriba", 36, margen-30, azul);
-        //Imagen2.recycle();
+        Imagen = Tomar();
+        canvas.drawBitmap(Imagen, mIzq-5,margen, new Paint());
+        margen+=Altura;
+
+        canvas.drawText("Fue por ella",mIzq,margen,negro);
+        margen+=2;
+
+        Bitmap Imagen2 = Tomar();
+        canvas.drawBitmap(Imagen2, mIzq-5,margen, new Paint());
+        margen+=Altura;
+
+        canvas.drawText("Y para ella",mIzq,margen,negro);
+        margen+=2;
+
+        Bitmap Imagen3 = Tomar();
+        canvas.drawBitmap(Imagen3, mIzq-5,margen, new Paint());
 
         document.finishPage(page);
 
@@ -587,51 +563,46 @@ public class Grafica extends IOIOActivity {
         BotonGuardar.setVisibility(View.INVISIBLE);
 
     }
+
+    private Bitmap Tomar() {
+        Bitmap Captura = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas Img = new Canvas(Captura);
+        Grafica.draw(Img);
+        Captura.setDensity(1100);
+        return Captura;
+    }*/
+    /*---------------------------------------------------------------------------*/
     /*------------ Metodos de creación y exportación del documento --------------*/
-    //Crear el documento pdf
-    /*private PdfDocument document = new PdfDocument();
+    private PdfDocument document = new PdfDocument();
     private boolean CrearPagina=true;
-    private boolean TerminarPagina=false;
     private PdfDocument.PageInfo pageInfo;
     private PdfDocument.Page page;
     private Canvas PaginaCanvas;
     private int EspacioTexto;
     private int NumPagina=1;
-    private int MargenExterno = 71;//Margen de 2.5 cm = 0.984252'' = 71 P.S.
-    private int MargenLateral = 85;//Margen de 3.0 cm = 1.1811'' = 85 P.S.
+    private int MargenExterno = 45;//Margen de 2.5 cm = 0.984252'' = 71 P.S.
+    private int MargenLateral = 40;//Margen de 3.0 cm = 1.1811'' = 85 P.S.
+    private int Altura = 232;//Altura de las imágenes
     private int pageWidth = 595;
     private int pageHeight = 842;
     private Paint ColorNegro = new Paint();
-    RectF dstRect;
-
-
 
     private void AgregarDatosPDF(final int A, final int B) {
-
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
 
                 //Obtener imagen
-                Imagen = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
-                Img = new Canvas(Imagen);
-                Grafica.draw(Img);
-
-                //Redimensionar imagen
-                final int redFactor = 3;
-                final int redImgWidth = Imagen.getWidth()/redFactor;
-                final int redImgHeight = Imagen.getHeight()/redFactor;
+                Imagen = CapturarGrafica();
 
                 //Texto para agregar
                 String tmpTxt = A+"-"+B+" s:";
 
-                if ( (EspacioTexto+redImgHeight) > (pageHeight-MargenExterno) ) {
+                if ( (EspacioTexto+Altura) > (pageHeight-MargenExterno) ) {
                     CrearPagina=true;
                     NumPagina++;
                     document.finishPage(page);
                 }
-
-
                 if (CrearPagina) {
                     // Crear un page description
                     //El formato A4 es 8.27 × 11.69 -> en P.S. es 595x842
@@ -643,25 +614,17 @@ public class Grafica extends IOIOActivity {
                     ColorNegro.setColor(Color.BLACK);//Color Negro
                     CrearPagina = false;
                 }
-
                 //Agregar texto
                 PaginaCanvas.drawText(tmpTxt, MargenLateral, EspacioTexto, ColorNegro);
-                EspacioTexto+=1;
+                EspacioTexto+=2;
                 //Agregar imagen
-                dstRect = new RectF(MargenLateral, EspacioTexto, redImgWidth, redImgHeight);
-                PaginaCanvas.drawBitmap(Imagen, null,dstRect, new Paint());
-                EspacioTexto = EspacioTexto + redImgHeight-20;
-
-                //Imagen.recycle();
-                //Img.drawColor(Color.WHITE);
-
+                PaginaCanvas.drawBitmap(Imagen, MargenLateral-5,EspacioTexto, new Paint());
+                EspacioTexto+=Altura;
             }//Run
         });//Runnable
 
-
-
     }//AgregarDatosPDF
-    public void PDF(View view) {
+    public void GuardarPDF(View view) {
         document.finishPage(page);
 
         File filepath = Environment.getExternalStorageDirectory();
@@ -682,8 +645,15 @@ public class Grafica extends IOIOActivity {
 
         toast("Ducumento guardado en "+dir.getAbsolutePath()+" como "+file.getName());
         BotonGuardar.setVisibility(View.INVISIBLE);
-    }*/
+    }
 
+    private Bitmap CapturarGrafica() {
+        Bitmap Captura = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas Img = new Canvas(Captura);
+        Grafica.draw(Img);
+        Captura.setDensity(1100);
+        return Captura;
+    }
     /*---------------------------------------------------------------------------*/
 
 
