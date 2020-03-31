@@ -59,7 +59,7 @@ public class Grafica extends IOIOActivity {
     OutputStream outputStream;
     private int ConteoPDF = 1;
     private Bitmap Imagen;
-    //Probando las subidas
+    //Si esto cambia si funciona
     /*-----------------------------------------*/
 
     /*-------- Variables temporizador ---------*/
