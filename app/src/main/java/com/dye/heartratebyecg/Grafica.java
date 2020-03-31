@@ -8,31 +8,18 @@ import ioio.lib.util.android.IOIOActivity;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.graphics.pdf.PdfDocument;
-import android.net.MailTo;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.SystemClock;
-import android.support.design.canvas.CanvasCompat;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.FileProvider;
-import android.util.DisplayMetrics;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
@@ -40,36 +27,38 @@ import android.widget.Toast;
 
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.GridLabelRenderer;
-import com.jjoe64.graphview.SecondScale;
 import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Iterator;
 import java.util.Locale;
 
 public class Grafica extends IOIOActivity {
 
-    /*---------- Variables generales ----------*/
-    private int conteo = 1;//Conteo para promediar la variabilidad de frecuencia
+    /*-------- Variables programables ---------*/
     private final int Pin_ECG=40;//Este es el pin de entrada analogico
+    private final long milisegundos = 10;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    private int CantidadMuestrasUmbral=40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
     private final int CantidadMuestras = 300;//Este es el numero de muestras que verá en la grafica
     private final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
-    private final long milisegundos = 10;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    /*-----------------------------------------*/
+
+    /*-------- Variables generales ------------*/
+    private int conteo = 1;//Conteo para promediar la variabilidad de frecuencia
     private int ejeX = 0;//Esta variable llevará el desplazamiento en eje X de la grafica
     private int CantidadPulsos = 0;//Esta variable llevará el conteo de pulsos
-    private double lectura, promedio;//Variables para la lectura analogica, y calculo de umbral.
+    private double promedio;//Variables para el calculo de umbral.
     private double umbral=50;
     private int ConteoMuestras=0;//Variable para el promedio que se lleva para calcular el umbral.
-    private int CantidadMuestrasUmbral=40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
-    private long TiempoA,TiempoB;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
     private double RC_aprox=0;
+    //PDF
+    OutputStream outputStream;
+    private int ConteoPDF = 1;
+    private Bitmap Imagen;
     /*-----------------------------------------*/
 
     /*-------- Variables temporizador ---------*/
@@ -82,9 +71,6 @@ public class Grafica extends IOIOActivity {
 
     /*---------- Variables de Views -----------*/
     //Texto
-    //private TextView LecturaActual;
-    //private TextView MuestrasUmbral;
-    //private TextView ValorUmbral;
     private TextView TextoPulsos;
     private TextView TextoTemporizador;
     private TextView TextoRitmoCardiaco;
@@ -97,14 +83,6 @@ public class Grafica extends IOIOActivity {
     private GraphView Grafica;
     private LineGraphSeries<DataPoint> series;
     /*-----------------------------------------*/
-    private StringBuilder Datos = new StringBuilder();
-    private int numerito = 0;
-    //private Bitmap Imagen;
-    OutputStream outputStream,outputStream2;
-    private int ConteoPDF = 1;
-
-    Bitmap Imagen;
-    Canvas Img;
 
 
     @Override
@@ -112,23 +90,18 @@ public class Grafica extends IOIOActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_grafica);
 
-        // Permisos
+        /*------- Permisos para escritura, lectura y Bluetooth --------*/
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},1000);
-        }
-        if( ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+        } if( ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE},1000);
-        }
-        if( ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+        } if( ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH},1000);
         }
-
+        /*--------------------------------------------------------------*/
 
         /*--- Asociar las variables de Views con las views de la GUI ---*/
         //Texto
-        //LecturaActual = findViewById(R.id.tv_Lectura);
-        //MuestrasUmbral = findViewById(R.id.tv_MuestasUmbral);
-        //ValorUmbral = findViewById(R.id.tv_ValorUmbral);
         TextoPulsos = findViewById(R.id.tv_Pulsos);
         TextoTemporizador = findViewById(R.id.tv_Temporizador);
         TextoRitmoCardiaco = findViewById(R.id.tv_RC);
@@ -141,13 +114,7 @@ public class Grafica extends IOIOActivity {
         Grafica = findViewById(R.id.grafica);
         /*--------------------------------------------------------------*/
 
-        /*---------- GraphView y personalización de la gráfica ---------
-        ViewGroup.LayoutParams Parametros = Grafica.getLayoutParams();
-        Parametros.height = Parametros.width/2;
-        Grafica.setLayoutParams(Parametros);*/
-
-
-
+        /*---------- GraphView y personalización de la gráfica ---------*/
         series = new LineGraphSeries<DataPoint>();
         Grafica.addSeries(series);
 
@@ -155,8 +122,6 @@ public class Grafica extends IOIOActivity {
         GridLabelRenderer Label = Grafica.getGridLabelRenderer();
         Label.setGridColor(getResources().getColor(R.color.GrisOscuro));
         Grid.setDrawBorder(true);
-
-
 
         Grid.setXAxisBoundsManual(true);
         Grid.setYAxisBoundsManual(true);
@@ -166,31 +131,15 @@ public class Grafica extends IOIOActivity {
         Grid.setMaxY(multiplicador);
         Grid.setScrollable(false);
 
-
         Label.setNumHorizontalLabels(CantidadMuestras);
         Label.setNumVerticalLabels(multiplicador);
         Label.setVerticalLabelsVisible(false);
         Label.setHorizontalLabelsVisible(false);
 
         Label.reloadStyles();
-
-        /*Viewport viewport = Grafica.getViewport();
-        viewport.setXAxisBoundsManual(true);
-        viewport.setYAxisBoundsManual(true);
-        viewport.setMinX(0);
-        viewport.setMinY(0);
-        viewport.setMaxX(CantidadMuestras);
-        viewport.setMaxY(multiplicador);
-        viewport.setScrollable(false);
-        Grafica.getGridLabelRenderer().setNumHorizontalLabels(CantidadMuestras);
-        Grafica.getGridLabelRenderer().setNumVerticalLabels(multiplicador);
-        Grafica.getGridLabelRenderer().setHorizontalLabelsVisible(false);
-        Grafica.getGridLabelRenderer().setVerticalLabelsVisible(false);
-        //Grafica.getGridLabelRenderer().setHumanRounding(true);*/
         /*--------------------------------------------------------------*/
 
-        //Datos.append("Tiempo,Muestra");
-        //Aceleracion de Hardware para la gráfica
+        //Aceleracion de Hardware para la gráfica con GraphView
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
 
@@ -224,14 +173,16 @@ public class Grafica extends IOIOActivity {
             }
         }//Cierre setup
 
+        //Variables
         private long T1, T2;
         private double RC_prom=0;
         private double RC_temp;
         int cant = 10;
-
         private int Num=1;
         private int TiempoInicial=0;
         private int TiempoFinal;
+        private double lectura;
+        private long TiempoA,TiempoB;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
         /**
          * Llamado repetidamente mientras el IOIO está conectado.
          * En este método se programa lo que quiere que la tarjeta haga durante su ejecución.
