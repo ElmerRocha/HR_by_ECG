@@ -41,7 +41,7 @@ public class Grafica extends IOIOActivity {
 
     /*-------- Variables programables ---------*/
     private final int Pin_ECG=40;//Este es el pin de entrada analogico
-    private final long milisegundos = 10;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    private final long milisegundos = 20;//Este valor es la frecuencia con la que se tomará una muestra analogica
     private int CantidadMuestrasUmbral=40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
     private final int CantidadMuestras = 300;//Este es el numero de muestras que verá en la grafica
     private final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
@@ -221,11 +221,25 @@ public class Grafica extends IOIOActivity {
                         }
                     }//If(lectura>umbral)
 
-                    if(ConteoPDF >= Num*CantidadMuestras) {
-                        TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
-                        AgregarDatosPDF(TiempoInicial,TiempoFinal);
-                        TiempoInicial=TiempoFinal;
-                        Num++;
+                    if( (ConteoPDF >= Num*CantidadMuestras) || (ConteoPDF == 20090805) ) {
+
+                        if(ConteoPDF == 20090805) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    ConteoPDF=0;
+                                    BotonGuardar.setVisibility(View.VISIBLE);
+                                    Graficando=false;
+                                    BotonGraficar.setText("Graficar");
+                                }
+                            });
+
+                        } else {
+                            TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
+                            AgregarDatosPDF(TiempoInicial,TiempoFinal);
+                            TiempoInicial=TiempoFinal;
+                            Num++;
+                        }
                     }
 
                     actualizarTextoGrafica(CantidadPulsos,RC_aprox);
@@ -233,20 +247,10 @@ public class Grafica extends IOIOActivity {
                     Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
                 }//If(graficando)
 
-                if(ConteoPDF == 20090805) {
-                    TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
-                    AgregarDatosPDF(TiempoInicial,TiempoFinal);
-                    TiempoInicial=TiempoFinal;
 
-                    Graficando=false;
-                    ConteoPDF=0;
-                    BotonGuardar.setVisibility(View.VISIBLE);
-                }
 
-            } catch (InterruptedException e) {
-                ioio_.disconnect();
-                throw e;
             } catch (ConnectionLostException e) {
+                ioio_.disconnect();
                 throw e;
             }
         }//Cierre loop
