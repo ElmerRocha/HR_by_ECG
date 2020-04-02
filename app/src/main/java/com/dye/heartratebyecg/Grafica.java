@@ -35,6 +35,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 public class Grafica extends IOIOActivity {
@@ -42,7 +44,7 @@ public class Grafica extends IOIOActivity {
     /*-------- Variables programables ---------*/
     private final int Pin_ECG=40;//Este es el pin de entrada analogico
     private final long milisegundos = 20;//Este valor es la frecuencia con la que se tomará una muestra analogica
-    private int CantidadMuestrasUmbral=40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
+    private int CantidadMuestrasUmbral = 40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
     private final int CantidadMuestras = 300;//Este es el numero de muestras que verá en la grafica
     private final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
     /*-----------------------------------------*/
@@ -59,7 +61,7 @@ public class Grafica extends IOIOActivity {
     OutputStream outputStream;
     private int ConteoPDF = 1;
     private Bitmap Imagen;
-    //Si esto cambia si funciona
+    SimpleDateFormat fecha = new SimpleDateFormat("yyyy_MM_dd_HH_mm", Locale.getDefault());//Formato de fecha
     /*-----------------------------------------*/
 
     /*-------- Variables temporizador ---------*/
@@ -84,7 +86,6 @@ public class Grafica extends IOIOActivity {
     private GraphView Grafica;
     private LineGraphSeries<DataPoint> series;
     /*-----------------------------------------*/
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,7 +117,8 @@ public class Grafica extends IOIOActivity {
         /*--------------------------------------------------------------*/
 
         /*---------- GraphView y personalización de la gráfica ---------*/
-        series = new LineGraphSeries<DataPoint>();
+        //series = new LineGraphSeries<DataPoint>();
+        series = new LineGraphSeries<>();
         Grafica.addSeries(series);
 
         Viewport Grid = Grafica.getViewport();
@@ -192,7 +194,6 @@ public class Grafica extends IOIOActivity {
          */
         @Override
         public void loop() throws ConnectionLostException, InterruptedException {
-
             try {
                 if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
                     lectura = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
@@ -201,7 +202,7 @@ public class Grafica extends IOIOActivity {
                     if(lectura > umbral) {
                         T1 = T2;
                         T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
-
+                        //Este if  detecta una onda R
                         if ((T2-T1)>400) {//400 ms porque es el promedio de duración del segmento QT
                             TiempoA = TiempoB;
                             TiempoB = SystemClock.elapsedRealtime();
@@ -221,6 +222,7 @@ public class Grafica extends IOIOActivity {
                         }
                     }//If(lectura>umbral)
 
+                    //If para ir agregando cosas al PDF
                     if( (ConteoPDF >= Num*CantidadMuestras) || (ConteoPDF == 20090805) ) {
 
                         if(ConteoPDF == 20090805) {
@@ -234,13 +236,15 @@ public class Grafica extends IOIOActivity {
                                 }
                             });
 
-                        } else {
-                            TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
-                            AgregarDatosPDF(TiempoInicial,TiempoFinal);
-                            TiempoInicial=TiempoFinal;
-                            Num++;
                         }
-                    }
+                        TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
+                        if(TiempoInicial != TiempoFinal) {
+                            AgregarDatosPDF(TiempoInicial,TiempoFinal);
+                        }
+                        TiempoInicial=TiempoFinal;
+                        Num++;
+                    }//if (ConteoPDF)
+
 
                     actualizarTextoGrafica(CantidadPulsos,RC_aprox);
                     agregarEntradaGrafica(lectura);
@@ -256,7 +260,7 @@ public class Grafica extends IOIOActivity {
         }//Cierre loop
 
 
-        //Método para mostrar cuando se deconecta IOIO
+        //Método para mostrar cuando se desconecta IOIO
         @Override
         public void disconnected() {
             toast("¡IOIO se ha desconectado!");
@@ -572,7 +576,7 @@ public class Grafica extends IOIOActivity {
                 }
                 //Agregar texto
                 PaginaCanvas.drawText(tmpTxt, MargenLateral, EspacioTexto, ColorNegro);
-                EspacioTexto+=2;
+                EspacioTexto+=2;//Salto de linea
                 //Agregar imagen
                 PaginaCanvas.drawBitmap(Imagen, MargenLateral-5,EspacioTexto, new Paint());
                 EspacioTexto+=Altura;
@@ -586,7 +590,7 @@ public class Grafica extends IOIOActivity {
         File filepath = Environment.getExternalStorageDirectory();
         File dir = new File(filepath.getAbsolutePath() + "/PDF/");
         if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
-        File file = new File(dir, "ECG_"+System.currentTimeMillis()+".pdf");
+        File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
 
         try {
             outputStream = new FileOutputStream(file);
