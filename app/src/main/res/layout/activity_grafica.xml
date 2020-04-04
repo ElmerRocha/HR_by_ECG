@@ -5,14 +5,206 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/fondo"
+    android:animateLayoutChanges="true"
     tools:context=".Grafica">
 
     <ScrollView
+        android:id="@+id/Layout1"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginStart="1dp"
-        android:layout_marginTop="1dp"
-        android:layout_marginEnd="1dp">
+        android:visibility="visible"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txt_titulo_usuario"
+                android:textColor="@color/Blanco"
+                android:textSize="24sp"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:layout_marginTop="20dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/txt_Datos" />
+
+            <TableLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:layout_marginStart="5dp"
+                android:layout_marginTop="10dp">
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/tv_nombre"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/txt_Nombre"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                    <EditText
+                        android:layout_marginStart="5dp"
+                        android:id="@+id/et_nombre"
+                        android:importantForAutofill="no"
+                        tools:ignore="Autofill"
+                        android:hint="@string/txt_Nombre"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ems="15"
+                        android:inputType="textPersonName"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/tv_edad"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/txt_Edad"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                    <EditText
+                        android:id="@+id/et_edad"
+                        android:layout_marginStart="5dp"
+                        android:importantForAutofill="no"
+                        tools:ignore="Autofill"
+                        android:hint="@string/txt_Edad"
+                        android:layout_width="3sp"
+                        android:layout_height="wrap_content"
+                        android:ems="9"
+                        android:inputType="number"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/tv_altura"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/txt_Altura"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                    <EditText
+                        android:id="@+id/et_altura"
+                        android:layout_marginStart="5dp"
+                        android:importantForAutofill="no"
+                        tools:ignore="Autofill"
+                        android:hint="@string/txt_Altura"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ems="9"
+                        android:inputType="number"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                </TableRow>
+
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/tv_peso"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/txt_Peso"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                    <EditText
+                        android:id="@+id/et_peso"
+                        android:layout_marginStart="5dp"
+                        android:importantForAutofill="no"
+                        tools:ignore="Autofill"
+                        android:hint="@string/txt_Peso"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ems="9"
+                        android:inputType="number"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/tv_genero"
+                        android:layout_gravity="center_vertical"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/txt_Genero"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                    <RadioGroup
+                        android:id="@+id/rg_genero"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+
+                        <RadioButton
+                            android:id="@+id/rb_F"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/txt_GeneroF"
+                            android:textColor="@color/Blanco"
+                            android:textSize="18sp" />
+
+                        <RadioButton
+                            android:id="@+id/rb_M"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/txt_GeneroM"
+                            android:textColor="@color/Blanco"
+                            android:textSize="18sp" />
+                    </RadioGroup>
+
+                </TableRow>
+
+            </TableLayout>
+
+            <Button
+                android:id="@+id/botonGuardar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="30dp"
+                android:gravity="center"
+                android:onClick="BotonGuardar"
+                android:text="@string/btn_Guardar" />
+
+        </LinearLayout>
+    </ScrollView>
+
+
+    <ScrollView
+        android:id="@+id/Layout2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible"
+        tools:visibility="invisible">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -94,10 +286,10 @@
 
             <Button
                 android:id="@+id/btn_Graficar"
-                android:layout_marginTop="30dp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
+                android:layout_marginTop="30dp"
                 android:gravity="center"
                 android:onClick="BtnGraficar"
                 android:text="@string/tboton" />

@@ -30,10 +30,22 @@
     <string name="titulo5">Parar gráfica</string>
     <string name="titulo6">Segundos</string>
     <string name="BotonCSV">Guardar PDF</string>
+    <string name="txt_Datos">Datos del usuario</string>
+    <string name="txt_Nombre">Nombre </string>
+    <string name="txt_Edad">Edad</string>
+    <string name="txt_Genero">Género</string>
+    <string name="txt_GeneroM">Masculino</string>
+    <string name="txt_GeneroF">Femenino</string>
+    <string name="txt_Altura">Altura(cm)</string>
+    <string name="txt_Peso">Peso(kg)</string>
+    <string name="btn_Guardar">Guardar</string>
+
+
+
 
     <!-- Fragments -->
     <string name="title_activity_instrucciones">Instrucciones</string>
-    <string name="hello_blank_fragment2">Heart rate by ECG signal</string>
+    <string name="hello_blank_fragment">Heart rate by ECG signal</string>
     <string name="f1">Primer paso</string>
     <string name="f2">Segundo paso</string>
     <string name="f3">Tercer paso</string>
@@ -71,8 +83,5 @@
     <string name="fila5">Adulto Atleta</string>
     <string name="fila5_1">40-60</string>
     <string name="lectura7">Recuerde que varios factores pueden influir en la medición de la frecuencia cardíaca.</string>
-
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
 
 </resources>
