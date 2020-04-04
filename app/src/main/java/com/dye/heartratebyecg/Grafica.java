@@ -727,7 +727,6 @@ public class Grafica extends IOIOActivity {
                     if(Femenino.isChecked()) txt_Genero="Femenino";
                     if(Masculino.isChecked()) txt_Genero="Masculino";
 
-
                     if(txt_Nombre.isEmpty() || txt_Edad.isEmpty() || txt_Altura.isEmpty() ||
                        txt_Peso.isEmpty() || txt_Genero.isEmpty()) {//(RGenero.getCheckedRadioButtonId() == -1)) {
                         toast("Por favor rellene todos los datos.");
@@ -743,15 +742,9 @@ public class Grafica extends IOIOActivity {
                         editor.putBoolean("masculino",Masculino.isChecked());
                         editor.apply();
 
-                        /*InputMethodManager inputMethodManager =(InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                        if(inputMethodManager.isActive()) {
-                            inputMethodManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
-                        }*/
-
                         Layout1.animate().translationY(Layout1.getHeight()).setDuration(1000);
                         Layout2.setVisibility(View.VISIBLE);
                         Layout1.setVisibility(View.GONE);
-
                     }
                 }
             });
