@@ -76,7 +76,7 @@ public class Grafica extends IOIOActivity {
     private String txt_Genero;
     //PDF
     OutputStream outputStream,salida;
-    private int ConteoPDF = 0;
+    private int ConteoPDF = 1;
     private Bitmap Imagen;
     SimpleDateFormat fecha = new SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault());//Formato de fecha
     private int TiempoInicial;
@@ -178,7 +178,6 @@ public class Grafica extends IOIOActivity {
         Viewport Grid = Grafica.getViewport();
         GridLabelRenderer Label = Grafica.getGridLabelRenderer();
 
-
         Grid.setXAxisBoundsManual(true);
         Grid.setYAxisBoundsManual(true);
         Grid.setMinX(0.0001);
@@ -194,7 +193,7 @@ public class Grafica extends IOIOActivity {
 
         Label.setHumanRounding(false,false);
         Label.setNumHorizontalLabels(51);
-        Label.setNumVerticalLabels(11);
+        Label.setNumVerticalLabels(9);
         Label.setVerticalLabelsVisible(false);
         Label.setHorizontalLabelsVisible(false);
 
@@ -246,7 +245,7 @@ public class Grafica extends IOIOActivity {
         double RC_prom;
         double RC_temp;
         int cant = 10;
-        int Num=1;
+        int Num = 1;
         double lectura;
         long TiempoA,TiempoB,T_RR;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
         /**
@@ -286,23 +285,16 @@ public class Grafica extends IOIOActivity {
                     }
                 }//If(lectura>umbral)
 
-                //If para ir agregando cosas al PDF
-
-
                 actualizarTextoGrafica(CantidadPulsos,RC_aprox);
                 //agregarEntradaGrafica(lectura);
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         series.appendData(new DataPoint(ejeX++, lectura), true, CantidadMuestras,false);//ejeX va aumentando cada que se agrega un dato.
-                        if(Temporizador_contando){
-                            ConteoPDF++;
-                        }
-                        if (ConteoPDF == Num*CantidadMuestras) {
-                            TiempoFinal = (int) Math.round(((TiempoInicialTemporizador/1000.0) - (TiempoEnMilisegundos/1000.0)));
-                            if (TiempoInicial != TiempoFinal) {
-                                AgregarDatosPDF(TiempoInicial, TiempoFinal);
-                            }
+                        if (Temporizador_contando) ConteoPDF++;
+                        if (ConteoPDF == Num*CantidadMuestras) {//If para ir agregando cosas al PDF
+                            TiempoFinal = (int) ((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000);
+                            if (TiempoInicial != TiempoFinal) AgregarDatosPDF(TiempoInicial, TiempoFinal);
                             TiempoInicial = TiempoFinal;
                             Num++;
                         }//if (ConteoPDF)
@@ -384,14 +376,11 @@ public class Grafica extends IOIOActivity {
                 BotonTemporizador.setVisibility(View.INVISIBLE);
                 BotonReset.setVisibility(View.VISIBLE);
 
-
                 Graficando=false;
-                ConteoPDF = 0;
+                //ConteoPDF = 0;
 
-                TiempoFinal = (int) Math.round((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000.0);
-                if (TiempoInicial != TiempoFinal) {
-                    AgregarDatosPDF(TiempoInicial, TiempoFinal);
-                }
+                TiempoFinal = (int) ((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000);
+                if (TiempoInicial != TiempoFinal) AgregarDatosPDF(TiempoInicial, TiempoFinal);
                 BotonGuardar.setVisibility(View.VISIBLE);
                 BotonGraficar.setText("Graficar");
                 CalculoHRV(0, true);
@@ -647,7 +636,7 @@ public class Grafica extends IOIOActivity {
         Grafica.draw(Img);
 
         File directorio = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        File direct = new File(directorio.getAbsolutePath()+"/ECG_Imagenes/");
+        File direct = new File(directorio.getAbsolutePath()+"/ECG_Imagenes2/");
         if(!direct.exists()) direct.mkdir();
         File archivo = new File(direct,"ECG_"+i_n+".jpg");
         i_n++;
@@ -701,7 +690,5 @@ public class Grafica extends IOIOActivity {
         });
     }
     /*---------------------------------------------------------------------------*/
-
-
 
 }//Cierra Grafica
