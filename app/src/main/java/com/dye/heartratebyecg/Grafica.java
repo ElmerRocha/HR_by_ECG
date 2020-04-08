@@ -36,6 +36,7 @@ import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -45,15 +46,17 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Scanner;
 
 public class Grafica extends IOIOActivity {
 
     /*-------- Variables programables ---------*/
     final int Pin_ECG=40;//Este es el pin de entrada analogico
-    final long milisegundos = 20;//Este valor es la frecuencia con la que se tomará una muestra analogica
-    final int CantidadMuestrasUmbral = 40;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
-    final int CantidadMuestras = 300;//Este es el numero de muestras que verá en la grafica
+    final long milisegundos = 8;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    final int CantidadMuestrasUmbral = 100;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
+    final int CantidadMuestras = (int) (6/(milisegundos/1000.0));//Este es el numero de muestras que verá en la grafica
     final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
+    final int PorcentajeUmbral = 70;//Este valor es lo que se agrega para el umbral
     /*-----------------------------------------*/
 
     /*-------- Variables generales ------------*/
@@ -72,14 +75,16 @@ public class Grafica extends IOIOActivity {
     private String txt_Genero;
     //PDF
     OutputStream outputStream;
-    private int ConteoPDF = 1;
+    private int ConteoPDF = 0;
     private Bitmap Imagen;
     SimpleDateFormat fecha = new SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault());//Formato de fecha
+    private int TiempoInicial;
+    private int TiempoFinal;
     /*-----------------------------------------*/
 
     /*-------- Variables temporizador ---------*/
     private CountDownTimer Temporizador;
-    private static final long TiempoInicialTemporizador = 30000;//60.000 milisegundos son 60 segundos.
+    private static final long TiempoInicialTemporizador = 60000;//60.000 milisegundos son 60 segundos.
     private long TiempoEnMilisegundos = TiempoInicialTemporizador;
     private boolean Temporizador_contando;//Esta variable será la bandera del temporizador
     private boolean Graficando;//Esta variable será la bandera de la grafica
@@ -110,6 +115,9 @@ public class Grafica extends IOIOActivity {
     private RadioButton Femenino;
     private RadioButton Masculino;
     /*-----------------------------------------*/
+
+    File dir_ecg = Environment.getExternalStorageDirectory();
+    Scanner scanner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,29 +176,34 @@ public class Grafica extends IOIOActivity {
 
         Viewport Grid = Grafica.getViewport();
         GridLabelRenderer Label = Grafica.getGridLabelRenderer();
-        Label.setGridColor(getResources().getColor(R.color.GrisOscuro));
-        Grid.setDrawBorder(true);
+
 
         Grid.setXAxisBoundsManual(true);
         Grid.setYAxisBoundsManual(true);
         Grid.setMinX(0.0001);
         Grid.setMinY(0.0001);
-        Grid.setMaxX(CantidadMuestras);
-        Grid.setMaxY(multiplicador);
+        Grid.setMaxX(CantidadMuestras+0.0001);
+        Grid.setMaxY(multiplicador+0.0001);
         Grid.setScrollable(false);
 
-        Label.setNumHorizontalLabels(CantidadMuestras);
-        Label.setNumVerticalLabels(multiplicador);
+
+        Label.reloadStyles();
+        Label.setGridColor(getResources().getColor(R.color.BlancoTransparente));
+        Grid.setDrawBorder(true);
+
+        Label.setHumanRounding(false,false);
+        Label.setNumHorizontalLabels(51);
+        Label.setNumVerticalLabels(9);
         Label.setVerticalLabelsVisible(false);
         Label.setHorizontalLabelsVisible(false);
 
-        Label.reloadStyles();
+
         /*--------------------------------------------------------------*/
 
 
         //Aceleracion de Hardware para la gráfica con GraphView
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
 
         //Iniciar el temporizador
         actualizarTextoTemporizador();
@@ -216,9 +229,14 @@ public class Grafica extends IOIOActivity {
             toast("¡IOIO se ha conectado!");
             try {
                 EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
-            } catch (ConnectionLostException e) {
+                scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_normal.csv"));
+            } catch (ConnectionLostException | FileNotFoundException e) {
                 ioio_.disconnect();
-                throw e;
+                try {
+                    throw e;
+                } catch (FileNotFoundException ex) {
+                    ex.printStackTrace();
+                }
             }
         }//Cierre setup
 
@@ -228,10 +246,8 @@ public class Grafica extends IOIOActivity {
         double RC_temp;
         int cant = 10;
         int Num=1;
-        int TiempoInicial;
-        int TiempoFinal;
         double lectura;
-        long TiempoA,TiempoB;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
+        long TiempoA,TiempoB,T_RR;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
         /**
          * Llamado repetidamente mientras el IOIO está conectado.
          * En este método se programa lo que quiere que la tarjeta haga durante su ejecución.
@@ -240,72 +256,59 @@ public class Grafica extends IOIOActivity {
          */
         @Override
         public void loop() throws ConnectionLostException, InterruptedException {
-            try {
-                if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
-                    lectura = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
-                    umbral = promedioUmbral(lectura);
+            if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
+                //lectura = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
+                lectura = Float.parseFloat(scanner.nextLine());
+                umbral = CalculoUmbral(lectura);
 
-                    if (lectura > umbral) {
-                        T1 = T2;
-                        T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
-                        //Este if  detecta una onda R
-                        if (((T2-T1)>400) && Temporizador_contando) {//400 ms porque es el promedio de duración del segmento QT
-                            TiempoA = TiempoB;
-                            TiempoB = SystemClock.elapsedRealtime();
-                            RC_temp = 60.0 / ((TiempoB - TiempoA) / 1000.0);//Se divide en 1k para que la medida quede en segundos.
-                            RC_prom = RC_prom + RC_temp;
-                            if(TiempoA!=0) CalculoHRV((int)(TiempoB-TiempoA), false);
-                            if(conteo>=cant) {
-                                RC_aprox = RC_prom / cant;
-                                conteo = 1;
-                                RC_prom = 0;
-                            } else {
-                                conteo++;
-                            }
+                if (lectura > umbral) {
+                    T1 = T2;
+                    T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
+                    //Este if  detecta una onda R
+                    if ( (T2-T1)>400 ) {//400 ms porque es el promedio de duración del segmento QT
+                        TiempoA = TiempoB;
+                        TiempoB = SystemClock.elapsedRealtime();
+                        T_RR = TiempoB-TiempoA;
+                        RC_temp = 60.0 / (T_RR/1000.0);//Se divide en 1k para que la medida quede en segundos.
+                        RC_prom = RC_prom + RC_temp;
+                        if(conteo>=cant) {
+                            RC_aprox = RC_prom / cant;
+                            conteo = 1;
+                            RC_prom = 0;
+                        } else {
+                            conteo++;
+                        }
+                        if (Temporizador_contando) {
                             CantidadPulsos++;
-                            //if (Temporizador_contando) CantidadPulsos++;
+                            CalculoHRV((int)(T_RR), false);
                         }
-                    }//If(lectura>umbral)
+                    }
+                }//If(lectura>umbral)
 
-                    //If para ir agregando cosas al PDF
-                    if( (ConteoPDF >= Num*CantidadMuestras) || (ConteoPDF == 20090805) ) {
+                //If para ir agregando cosas al PDF
+                if (ConteoPDF >= Num*CantidadMuestras) {
 
-                        if(ConteoPDF == 20090805) {
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    ConteoPDF=0;
-                                    BotonGuardar.setVisibility(View.VISIBLE);
-                                    Graficando=false;
-                                    BotonGraficar.setText("Graficar");
-                                    CalculoHRV(0, true);
-                                }
-                            });
+                    TiempoFinal = (int) Math.round((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000.0);
+                    if (TiempoInicial != TiempoFinal) {
+                        AgregarDatosPDF(TiempoInicial, TiempoFinal);
+                    }
+                    TiempoInicial = TiempoFinal;
+                    Num++;
 
-                        }
-                        TiempoFinal=(int)(TiempoInicialTemporizador-TiempoEnMilisegundos)/1000;
-                        if(TiempoInicial != TiempoFinal) {
-                            AgregarDatosPDF(TiempoInicial,TiempoFinal);
-                        }
-                        TiempoInicial=TiempoFinal;
-                        Num++;
-                    }//if (ConteoPDF)
+                }//if (ConteoPDF)
 
+                actualizarTextoGrafica(CantidadPulsos,RC_aprox);
+                agregarEntradaGrafica(lectura);
 
-                    actualizarTextoGrafica(CantidadPulsos,RC_aprox);
-                    agregarEntradaGrafica(lectura);
-                    Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
-                }//If(graficando)
+                Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
+            }//If(graficando)
 
-            } catch (ConnectionLostException e) {
-                ioio_.disconnect();
-                throw e;
-            }
         }//Cierre loop
         //Método para mostrar cuando se desconecta IOIO
         @Override
         public void disconnected() {
             toast("¡IOIO se ha desconectado!");
+            scanner.close();
             EntradaAnalogica.close();
         }
 
@@ -368,7 +371,18 @@ public class Grafica extends IOIOActivity {
                 BotonTemporizador.setText("Contar pulsos");
                 BotonTemporizador.setVisibility(View.INVISIBLE);
                 BotonReset.setVisibility(View.VISIBLE);
-                ConteoPDF = 20090805;
+
+
+                Graficando=false;
+                ConteoPDF = 0;
+
+                TiempoFinal = (int) Math.round((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000.0);
+                if (TiempoInicial != TiempoFinal) {
+                    AgregarDatosPDF(TiempoInicial, TiempoFinal);
+                }
+                BotonGuardar.setVisibility(View.VISIBLE);
+                BotonGraficar.setText("Graficar");
+                CalculoHRV(0, true);
             }
         }.start();
 
@@ -412,29 +426,53 @@ public class Grafica extends IOIOActivity {
             promedio = promedio + lectura;
             ConteoMuestras++;
         } else {
-            umbral = 1.2*(promedio/CantidadMuestrasUmbral);
+            umbral = (1+(PorcentajeUmbral/100.0))*(promedio/CantidadMuestrasUmbral);
             promedio=0;
             ConteoMuestras=0;
         }
         return umbral;
     }
+    double Um_max,Um_min;
+    double Umb_calc=0;
+    List<Double> CalUmbral = new ArrayList<>();
+    private double CalculoUmbral(final double dato) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if(CalUmbral.size() == CantidadMuestrasUmbral) {
+                    Um_max = Collections.max(CalUmbral);
+                    Um_min = Collections.min(CalUmbral);
+                    Umb_calc = (Um_max - Um_min) * (PorcentajeUmbral/100.0);
+                    CalUmbral.clear();
+                } else {
+                    CalUmbral.add(dato);
+                }
+            }
+        });
+        return Umb_calc;
+    }
     /*---------------------------------------------------------------------------*/
 
     /*---------------------- Método para encontrar HRV --------------------------*/
-    List<Long> HRV = new ArrayList<>();
-    long HRV_tmp;
-    private long HRV_max,HRV_min,HRV_avg;
-    private void CalculoHRV(final long TRR, final boolean bool) {
+    List<Integer> HRV = new ArrayList<>();
+    int HRV_tmp=0;
+    private int HRV_max,HRV_min,HRV_avg;
+    private int HRV_Count;
+    private void CalculoHRV(final int TRR, final boolean bool) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if (bool) {
                     HRV_min = Collections.min(HRV);
                     HRV_max = Collections.max(HRV);
-                    for(Long i : HRV) HRV_tmp+=i;
                     HRV_avg = HRV_tmp/(HRV.size());
+                    HRV_Count = HRV.size();
                     HRV.clear();
-                } else HRV.add(TRR);
+                    HRV_tmp=0;
+                } else {
+                    HRV.add(TRR);
+                    HRV_tmp+=TRR;
+                }
             }
         });
     }
@@ -465,133 +503,6 @@ public class Grafica extends IOIOActivity {
         });
 
     }
-    /*---------------------------------------------------------------------------*/
-
-    /*-------------------- Compartir el CSV-----------------------*/
-    /*public void ExportarCSV(View view) throws IOException {
-
-        //Imagen = getViewBitmap(Grafica);
-
-        Imagen = Bitmap.createBitmap(Grafica.getWidth(),Grafica.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(Imagen);
-        Grafica.draw(canvas);
-
-        File filepath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        File dir = new File(filepath.getAbsolutePath()+"/Coco/");
-        dir.mkdir();
-        File file = new File(dir,"Cocos.jpg");
-        File file2 = new File(dir,"datos.csv");
-        try {
-            outputStream = new FileOutputStream(file);
-            outputStream2 = new FileOutputStream(file2);
-
-            Imagen.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
-            outputStream2.write((Datos.toString()).getBytes());
-
-            outputStream.flush();
-            //outputStream2.flush();
-            outputStream.close();
-            outputStream2.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-
-        }
-        toast("Imagen y archivo csv en "+dir.getAbsolutePath());
-
-
-        try{
-
-            //Guardar el archivo en el dispositivo
-            FileOutputStream out = openFileOutput("data.csv", Context.MODE_PRIVATE);
-            out.write((Datos.toString()).getBytes());
-            out.close();
-
-            //Exportando - Compartiendo
-            Context context = getApplicationContext();
-            File filelocation = new File(getFilesDir(), "data.csv");
-            Uri path = FileProvider.getUriForFile(context, "com.dye.heartratebyecg.fileprovider", filelocation);
-            Intent fileIntent = new Intent(Intent.ACTION_SEND);
-            fileIntent.setType("text/csv");
-            fileIntent.putExtra(Intent.EXTRA_SUBJECT, "Data");
-            fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            fileIntent.putExtra(Intent.EXTRA_STREAM, path);
-            startActivity(Intent.createChooser(fileIntent, "Guardar y compartir"));
-        }
-        catch(Exception e){
-            e.printStackTrace();
-        }
-
-        BotonGuardar.setVisibility(View.INVISIBLE);
-    }*/
-    /*------------------ Metodos de prueba para guadar PDF ----------------------*/
-    /*public void PDF(View view) throws IOException {
-        //Crear un nuevo documento
-        PdfDocument document = new PdfDocument();
-
-        // Crear un page description
-        //Las medidas son porque se utiliza el lenguaje PostScript que usa 1/72 de pulgada para las medidas
-        //El formato A4 es 8.27 × 11.69 -> en P.S. es 595x842
-        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
-        //Empezar Documento
-        PdfDocument.Page page = document.startPage(pageInfo);//Página 1
-        Canvas canvas = page.getCanvas();//Se obtiene la pagina en canvas para mapearla como una imagen
-
-        int margen=45;
-        int mIzq = 40;
-        int Altura = 232;
-
-        Paint negro = new Paint();negro.setColor(Color.BLACK);
-
-        canvas.drawText("Daniela hizo posible esto",mIzq,margen,negro);
-        margen+=2;
-
-        Imagen = Tomar();
-        canvas.drawBitmap(Imagen, mIzq-5,margen, new Paint());
-        margen+=Altura;
-
-        canvas.drawText("Fue por ella",mIzq,margen,negro);
-        margen+=2;
-
-        Bitmap Imagen2 = Tomar();
-        canvas.drawBitmap(Imagen2, mIzq-5,margen, new Paint());
-        margen+=Altura;
-
-        canvas.drawText("Y para ella",mIzq,margen,negro);
-        margen+=2;
-
-        Bitmap Imagen3 = Tomar();
-        canvas.drawBitmap(Imagen3, mIzq-5,margen, new Paint());
-
-        document.finishPage(page);
-
-        File filepath = Environment.getExternalStorageDirectory();
-        File dir = new File(filepath.getAbsolutePath() + "/PDF/");
-        if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
-        File file = new File(dir, "Prueba.pdf");
-
-        try {
-            outputStream = new FileOutputStream(file);
-            document.writeTo(outputStream);
-            document.close();
-            outputStream.flush();
-            outputStream.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-
-        }
-
-        toast("Ducumento guardado en "+dir.getAbsolutePath()+" como "+file.getName());
-        BotonGuardar.setVisibility(View.INVISIBLE);
-
-    }
-
-    private Bitmap Tomar() {
-        Bitmap Captura = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas Img = new Canvas(Captura);
-        Grafica.draw(Img);
-        Captura.setDensity(1100);
-        return Captura;
-    }*/
     /*---------------------------------------------------------------------------*/
 
     /*------------ Metodos de creación y exportación del documento --------------*/
@@ -656,12 +567,24 @@ public class Grafica extends IOIOActivity {
         if(Datos.getBoolean("femenino",false)) txt_Genero="Femenino";
         if(Datos.getBoolean("masculino",false)) txt_Genero="Masculino";
 
-        String HRVmax = HRV_max+" ms ("+HRV_max/60+") bpm";
-        String HRVmin = HRV_min+" ms ("+HRV_min/60+") bpm";
-        String HRVavg = HRV_avg+" ms ("+HRV_avg/60+") bpm";
+        int HR_max_aprox = (int) Math.round(60.0/(HRV_max/1000.0));
+        int HR_mix_aprox = (int) Math.round(60.0/(HRV_min/1000.0));
+        int HR_avg_aprox = (int) Math.round(60.0/(HRV_avg/1000.0));
 
-        String HRV_txt= "Max: "+HRVmax+", Min: "+HRVmin+", Prom: "+HRVavg;
+        String HRVmax = HRV_max+" ms ("+HR_max_aprox+" bpm)";
+        String HRVmin = HRV_min+" ms ("+HR_mix_aprox+" bpm)";
+        String HRVavg = HRV_avg+" ms ("+HR_avg_aprox+" bpm)";
 
+        String HRV_txt= "Max: "+HRVmax+",   Min: "+HRVmin+",    Prom: "+HRVavg;
+
+        //Finaliza la pagina anterior
+        document.finishPage(page);
+
+        //Crea una nueva página
+        pageInfo = new PdfDocument.PageInfo.Builder(pageWidth,pageHeight, NumPagina+1).create();
+        page = document.startPage(pageInfo);
+        PaginaCanvas = page.getCanvas();
+        EspacioTexto = MargenExterno;
 
         //Agregar texto
         PaginaCanvas.drawText("Resultados:", MargenLateral, EspacioTexto, ColorNegro);
@@ -678,16 +601,14 @@ public class Grafica extends IOIOActivity {
         EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Variabilidad de frecuencia cardiaca: ", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
-        PaginaCanvas.drawText(HRV_txt, MargenLateral+10, EspacioTexto, ColorNegro);
-
+        PaginaCanvas.drawText(HRV_txt, MargenLateral+5, EspacioTexto, ColorNegro);
+        EspacioTexto+=15;//Salto de linea
+        PaginaCanvas.drawText("Cantidad de muestas HRV: "+HRV_Count, MargenLateral, EspacioTexto, ColorNegro);
 
         document.finishPage(page);
 
-
-
-
         File filepath = Environment.getExternalStorageDirectory();
-        File dir = new File(filepath.getAbsolutePath() + "/PDF/");
+        File dir = new File(filepath.getAbsolutePath() + "/PDF1/");
         if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
         File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
 
@@ -716,42 +637,41 @@ public class Grafica extends IOIOActivity {
 
     /*---------------- Método para guardar datos del usuario ---------------------*/
     public void BotonGuardar(final View view) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    txt_Nombre = Nombre.getText().toString();
-                    txt_Edad = Edad.getText().toString();
-                    txt_Altura = Altura.getText().toString();
-                    txt_Peso = Peso.getText().toString();
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                txt_Nombre = Nombre.getText().toString();
+                txt_Edad = Edad.getText().toString();
+                txt_Altura = Altura.getText().toString();
+                txt_Peso = Peso.getText().toString();
 
-                    if(Femenino.isChecked()) txt_Genero="Femenino";
-                    if(Masculino.isChecked()) txt_Genero="Masculino";
+                if(Femenino.isChecked()) txt_Genero="Femenino";
+                if(Masculino.isChecked()) txt_Genero="Masculino";
 
-                    if(txt_Nombre.isEmpty() || txt_Edad.isEmpty() || txt_Altura.isEmpty() ||
-                       txt_Peso.isEmpty() || txt_Genero.isEmpty()) {//(RGenero.getCheckedRadioButtonId() == -1)) {
-                        toast("Por favor rellene todos los datos.");
-                    } else {
+                if(txt_Nombre.isEmpty() || txt_Edad.isEmpty() || txt_Altura.isEmpty() ||
+                        txt_Peso.isEmpty() || txt_Genero.isEmpty()) {//(RGenero.getCheckedRadioButtonId() == -1)) {
+                    toast("Por favor rellene todos los datos.");
+                } else {
 
-                        SharedPreferences pref = getSharedPreferences("datos", Context.MODE_PRIVATE);
-                        SharedPreferences.Editor editor = pref.edit();
-                        editor.putString("nombre", txt_Nombre);
-                        editor.putString("edad", txt_Edad);
-                        editor.putString("altura",txt_Altura);
-                        editor.putString("peso", txt_Peso);
-                        editor.putBoolean("femenino",Femenino.isChecked());
-                        editor.putBoolean("masculino",Masculino.isChecked());
-                        editor.apply();
+                    SharedPreferences pref = getSharedPreferences("datos", Context.MODE_PRIVATE);
+                    SharedPreferences.Editor editor = pref.edit();
+                    editor.putString("nombre", txt_Nombre);
+                    editor.putString("edad", txt_Edad);
+                    editor.putString("altura",txt_Altura);
+                    editor.putString("peso", txt_Peso);
+                    editor.putBoolean("femenino",Femenino.isChecked());
+                    editor.putBoolean("masculino",Masculino.isChecked());
+                    editor.apply();
 
-                        Layout1.animate().translationY(Layout1.getHeight()).setDuration(1000);
-                        Layout2.setVisibility(View.VISIBLE);
-                        Layout1.setVisibility(View.GONE);
-                    }
+                    Layout1.animate().translationY(Layout1.getHeight()).setDuration(1000);
+                    Layout2.setVisibility(View.VISIBLE);
+                    Layout1.setVisibility(View.GONE);
                 }
-            });
+            }
+        });
     }
     /*---------------------------------------------------------------------------*/
 
 
 
 }//Cierra Grafica
-
