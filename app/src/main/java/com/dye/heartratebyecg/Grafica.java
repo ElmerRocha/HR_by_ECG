@@ -7,6 +7,7 @@ import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -63,9 +64,9 @@ public class Grafica extends IOIOActivity {
     private int conteo = 1;//Conteo para promediar la variabilidad de frecuencia
     private int ejeX = 0;//Esta variable llevará el desplazamiento en eje X de la grafica
     private int CantidadPulsos = 0;//Esta variable llevará el conteo de pulsos
-    private double promedio;//Variables para el calculo de umbral.
-    private double umbral=50;
-    private int ConteoMuestras=0;//Variable para el promedio que se lleva para calcular el umbral.
+    //private double promedio;//Variables para el calculo de umbral.
+    double umbral=50;
+    //private int ConteoMuestras=0;//Variable para el promedio que se lleva para calcular el umbral.
     private double RC_aprox=0;
     //Texto
     private String txt_Nombre;
@@ -74,7 +75,7 @@ public class Grafica extends IOIOActivity {
     private String txt_Peso;
     private String txt_Genero;
     //PDF
-    OutputStream outputStream;
+    OutputStream outputStream,salida;
     private int ConteoPDF = 0;
     private Bitmap Imagen;
     SimpleDateFormat fecha = new SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault());//Formato de fecha
@@ -182,10 +183,10 @@ public class Grafica extends IOIOActivity {
         Grid.setYAxisBoundsManual(true);
         Grid.setMinX(0.0001);
         Grid.setMinY(0.0001);
-        Grid.setMaxX(CantidadMuestras+0.0001);
+        Grid.setMaxX(CantidadMuestras);
         Grid.setMaxY(multiplicador+0.0001);
         Grid.setScrollable(false);
-
+        Grid.setScalable(false);
 
         Label.reloadStyles();
         Label.setGridColor(getResources().getColor(R.color.BlancoTransparente));
@@ -193,7 +194,7 @@ public class Grafica extends IOIOActivity {
 
         Label.setHumanRounding(false,false);
         Label.setNumHorizontalLabels(51);
-        Label.setNumVerticalLabels(9);
+        Label.setNumVerticalLabels(11);
         Label.setVerticalLabelsVisible(false);
         Label.setHorizontalLabelsVisible(false);
 
@@ -255,7 +256,7 @@ public class Grafica extends IOIOActivity {
          * Lanza InterruptedException cuando el hilo IOIO ha sido interrumpido.
          */
         @Override
-        public void loop() throws ConnectionLostException, InterruptedException {
+        public void loop() throws InterruptedException {
             if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
                 //lectura = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
                 lectura = Float.parseFloat(scanner.nextLine());
@@ -286,19 +287,27 @@ public class Grafica extends IOIOActivity {
                 }//If(lectura>umbral)
 
                 //If para ir agregando cosas al PDF
-                if (ConteoPDF >= Num*CantidadMuestras) {
 
-                    TiempoFinal = (int) Math.round((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000.0);
-                    if (TiempoInicial != TiempoFinal) {
-                        AgregarDatosPDF(TiempoInicial, TiempoFinal);
-                    }
-                    TiempoInicial = TiempoFinal;
-                    Num++;
-
-                }//if (ConteoPDF)
 
                 actualizarTextoGrafica(CantidadPulsos,RC_aprox);
-                agregarEntradaGrafica(lectura);
+                //agregarEntradaGrafica(lectura);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        series.appendData(new DataPoint(ejeX++, lectura), true, CantidadMuestras,false);//ejeX va aumentando cada que se agrega un dato.
+                        if(Temporizador_contando){
+                            ConteoPDF++;
+                        }
+                        if (ConteoPDF == Num*CantidadMuestras) {
+                            TiempoFinal = (int) Math.round(((TiempoInicialTemporizador/1000.0) - (TiempoEnMilisegundos/1000.0)));
+                            if (TiempoInicial != TiempoFinal) {
+                                AgregarDatosPDF(TiempoInicial, TiempoFinal);
+                            }
+                            TiempoInicial = TiempoFinal;
+                            Num++;
+                        }//if (ConteoPDF)
+                    }
+                });
 
                 Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
             }//If(graficando)
@@ -333,6 +342,7 @@ public class Grafica extends IOIOActivity {
     /*--------------------------------------------------------------------------*/
 
     /*----------------------------- Métodos de botones --------------------------*/
+    @SuppressLint("SetTextI18n")
     public void BtnGraficar(View view) {
         if(Graficando) {
             Graficando = false;
@@ -356,6 +366,7 @@ public class Grafica extends IOIOActivity {
     /*---------------------------------------------------------------------------*/
 
     /*------------------------ Métodos de temporizador --------------------------*/
+    @SuppressLint("SetTextI18n")
     private void empezarTemporizador() {
         Temporizador = new CountDownTimer(TiempoEnMilisegundos, 1000) {//1000 milisegundos = 1 segundo.
             @Override
@@ -365,6 +376,7 @@ public class Grafica extends IOIOActivity {
                 actualizarTextoTemporizador();
             }
 
+            @SuppressLint("SetTextI18n")
             @Override
             public void onFinish() {
                 Temporizador_contando = false;
@@ -390,12 +402,14 @@ public class Grafica extends IOIOActivity {
         BotonTemporizador.setText("Pausar conteo");
         BotonReset.setVisibility(View.INVISIBLE);
     }
+    @SuppressLint("SetTextI18n")
     private void pausarTemporizador() {
         Temporizador.cancel();
         Temporizador_contando = false;
         BotonTemporizador.setText("Reanudar conteo");
         BotonReset.setVisibility(View.VISIBLE);
     }
+    @SuppressLint("SetTextI18n")
     private void resetTemporizador() {
         TiempoEnMilisegundos = TiempoInicialTemporizador;
         BotonTemporizador.setText("Contar pulsos");
@@ -420,7 +434,7 @@ public class Grafica extends IOIOActivity {
     /*---------------------------------------------------------------------------*/
 
     /*-------------------------- Método de umbral -------------------------------*/
-    private double promedioUmbral(double lectura) {
+    /*private double promedioUmbral(double lectura) {
         //Ciclo para calcular el umbral
         if (ConteoMuestras < CantidadMuestrasUmbral) {
             promedio = promedio + lectura;
@@ -431,10 +445,10 @@ public class Grafica extends IOIOActivity {
             ConteoMuestras=0;
         }
         return umbral;
-    }
+    }*/
+    List<Double> CalUmbral = new ArrayList<>();
     double Um_max,Um_min;
     double Umb_calc=0;
-    List<Double> CalUmbral = new ArrayList<>();
     private double CalculoUmbral(final double dato) {
         runOnUiThread(new Runnable() {
             @Override
@@ -479,7 +493,7 @@ public class Grafica extends IOIOActivity {
     /*---------------------------------------------------------------------------*/
 
     /*------------------------ Métodos de Gráfica -------------------------------*/
-    private void agregarEntradaGrafica(final double datoEntrada) {//Metodo para agregar datos a GraphView
+    /*private void agregarEntradaGrafica(final double datoEntrada) {//Metodo para agregar datos a GraphView
         //Se elige mostar maximo # puntos en el Viewpoint y que haga scroll hasta el final
         runOnUiThread(new Runnable() {
             @Override
@@ -489,7 +503,7 @@ public class Grafica extends IOIOActivity {
             }
         });
 
-    }
+    }*/
     private void actualizarTextoGrafica(int pulsos, double rc) {
         final String v1 = pulsos+" bpm";
         final String v2 = (int)rc + " bpm";//Se hace un cast de RC para convertirlo en entero.
@@ -518,6 +532,7 @@ public class Grafica extends IOIOActivity {
     private int AlturaImg = 232;//Altura de las imágenes
     private int pageWidth = 595;
     private int pageHeight = 842;
+    private int i_n=1;
     private Paint ColorNegro = new Paint();
 
     private void AgregarDatosPDF(final int A, final int B) {
@@ -608,7 +623,7 @@ public class Grafica extends IOIOActivity {
         document.finishPage(page);
 
         File filepath = Environment.getExternalStorageDirectory();
-        File dir = new File(filepath.getAbsolutePath() + "/PDF1/");
+        File dir = new File(filepath.getAbsolutePath() + "/PDF_Pruebas/");
         if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
         File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
 
@@ -630,6 +645,21 @@ public class Grafica extends IOIOActivity {
         Bitmap Captura = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas Img = new Canvas(Captura);
         Grafica.draw(Img);
+
+        File directorio = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        File direct = new File(directorio.getAbsolutePath()+"/ECG_Imagenes/");
+        if(!direct.exists()) direct.mkdir();
+        File archivo = new File(direct,"ECG_"+i_n+".jpg");
+        i_n++;
+        try {
+            salida = new FileOutputStream(archivo);
+            Captura.compress(Bitmap.CompressFormat.JPEG, 100, salida);
+            salida.flush();
+            salida.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         Captura.setDensity(1100);
         return Captura;
     }
