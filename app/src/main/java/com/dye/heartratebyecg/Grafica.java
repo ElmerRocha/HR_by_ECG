@@ -1,7 +1,7 @@
 package com.dye.heartratebyecg;
 
-//import ioio.lib.api.AnalogInput;
-//import ioio.lib.api.exception.ConnectionLostException;
+import ioio.lib.api.AnalogInput;
+import ioio.lib.api.exception.ConnectionLostException;
 import ioio.lib.util.BaseIOIOLooper;
 import ioio.lib.util.IOIOLooper;
 import ioio.lib.util.android.IOIOActivity;
@@ -9,6 +9,7 @@ import ioio.lib.util.android.IOIOActivity;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -16,11 +17,13 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.FileProvider;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -53,12 +56,16 @@ import java.util.Scanner;
 public class Grafica extends IOIOActivity {
 
     /*-------- Variables programables ---------*/
-    //final int Pin_ECG=40;//Este es el pin de entrada analogico
-    final long milisegundos = 4;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    final int Pin_ECG=46;//Este es el pin de entrada analogico
+    //final long milisegundos = 10;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    //final long milisegundos = 4;//Prueba CSV cu17
+    final long milisegundos = 4;//Prueba CSV 803
     final int CantidadMuestrasUmbral = 100;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
     final int CantidadMuestras = (int) (6/(milisegundos/1000.0));//Este es el numero de muestras que verá en la grafica
     final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
-    final int PorcentajeUmbral = 20;//Este valor es lo que se agrega para el umbral
+    //final int PorcentajeUmbral = 11;//Este valor es lo que se agrega para el umbral
+    final int PorcentajeUmbral = 30;//Prueba CSV
+    final int QT = 290;//Duración promedio de segmento QT en ms.
     /*-----------------------------------------*/
 
     /*-------- Variables generales ------------*/
@@ -76,7 +83,7 @@ public class Grafica extends IOIOActivity {
     private String txt_Peso;
     private String txt_Genero;
     //PDF
-    OutputStream outputStream,salida;
+    OutputStream outputStream;
     private int ConteoPDF = 1;
     Bitmap Imagen;
     SimpleDateFormat fecha = new SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault());//Formato de fecha
@@ -102,11 +109,12 @@ public class Grafica extends IOIOActivity {
     private Button BotonReset;
     private Button BotonGraficar;
     private Button BotonGuardar;
+    private Button BotonCompartir;
     //Grafica
     private GraphView Grafica;
     private LineGraphSeries<DataPoint> series;
     private PointsGraphSeries<DataPoint> RR;
-    //private LineGraphSeries<DataPoint> Lumb;
+    private LineGraphSeries<DataPoint> Lumb;
     //Layouts
     private ScrollView Layout1;
     private ScrollView Layout2;
@@ -125,17 +133,11 @@ public class Grafica extends IOIOActivity {
     File dir_ecg = Environment.getExternalStorageDirectory();
     Scanner scanner;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_grafica);
 
-        try {
-            scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_taquiarritmia3.csv"));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
 
         /*------- Permisos para escritura, lectura y Bluetooth --------*/
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -157,6 +159,7 @@ public class Grafica extends IOIOActivity {
         BotonReset = findViewById(R.id.btn_ResetTempo);
         BotonGraficar = findViewById(R.id.btn_Graficar);
         BotonGuardar = findViewById(R.id.boton_guardar);
+        BotonCompartir = findViewById(R.id.boton_compartir);
         //Grafica
         Grafica = findViewById(R.id.grafica);
         //EditTexts
@@ -186,11 +189,11 @@ public class Grafica extends IOIOActivity {
         //series = new LineGraphSeries<DataPoint>();
         series = new LineGraphSeries<>();
         RR = new PointsGraphSeries<>();
-        //Lumb = new LineGraphSeries<>();
+        Lumb = new LineGraphSeries<>();
         Grafica.addSeries(series);
         Grafica.addSeries(RR);
-        //Grafica.addSeries(Lumb);
-        //Lumb.setColor(Color.GREEN);
+        Grafica.addSeries(Lumb);
+        Lumb.setColor(Color.GREEN);
         RR.setColor(Color.RED);
         RR.setSize(8f);
 
@@ -234,7 +237,7 @@ public class Grafica extends IOIOActivity {
      * Igual que en Arduino.
      */
     class Looper extends BaseIOIOLooper {
-        //private AnalogInput EntradaAnalogica;
+        private AnalogInput EntradaAnalogica;
 
         /**
          * Se llama cada vez que se establece una conexión con IOIO.
@@ -245,13 +248,16 @@ public class Grafica extends IOIOActivity {
         protected void setup() {//throws ConnectionLostException {
             toast("¡IOIO se ha conectado!");
             try {
-                //EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
-                scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_taquiarritmia3.csv"));
-            } catch (FileNotFoundException e) {
+                EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
+                //803
+                scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_supra.csv"));
+                //cu17
+                //scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_taquiarritmia3.csv"));
+            } catch (ConnectionLostException | FileNotFoundException e) {
                 ioio_.disconnect();
                 try {
                     throw e;
-                } catch (FileNotFoundException ex) {
+                } catch (ConnectionLostException | FileNotFoundException ex) {
                     ex.printStackTrace();
                 }
             }
@@ -262,8 +268,8 @@ public class Grafica extends IOIOActivity {
         double RC_prom;
         double RC_temp;
         int cant = 10;
-
-        double lectura;
+        double alfa = 0.45;
+        double lectura,adc;
         long TiempoA,TiempoB,T_RR;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
         /**
          * Llamado repetidamente mientras el IOIO está conectado.
@@ -272,10 +278,11 @@ public class Grafica extends IOIOActivity {
          * Lanza InterruptedException cuando el hilo IOIO ha sido interrumpido.
          */
         @Override
-        public void loop() throws InterruptedException {
+        public void loop() throws InterruptedException, ConnectionLostException {
             if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
-                //lectura = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
-                lectura = Float.parseFloat(scanner.nextLine());
+                //adc = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
+                //lectura = (alfa*adc) + ((1-alfa)*lectura);
+                lectura = Float.parseFloat(scanner.nextLine());//Para leer los datos del archivo .csv
                 umbral = promedioUmbral(lectura);
                 //umbral = CalculoUmbral(lectura);
 
@@ -283,7 +290,7 @@ public class Grafica extends IOIOActivity {
                     T1 = T2;
                     T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
                     //Este if  detecta una onda R
-                    if ( (T2-T1)> 380 ) {//400 ms porque es el promedio de duración del segmento QT
+                    if ( (T2-T1)> QT ) {//400 ms porque es el promedio de duración del segmento QT
                         TiempoA = TiempoB;
                         TiempoB = SystemClock.elapsedRealtime();
                         T_RR = TiempoB-TiempoA;
@@ -298,7 +305,7 @@ public class Grafica extends IOIOActivity {
                             CantidadPulsos++;
                             CalculoHRV((int)(T_RR), false);
                         }
-                        eRR=true;
+                        //eRR=true;
                     }//If(T2-T1)
                 }//If(lectura>umbral)
 
@@ -307,10 +314,10 @@ public class Grafica extends IOIOActivity {
                     public void run() {
                         series.appendData(new DataPoint(ejeX++, lectura), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
                         //Lumb.appendData(new DataPoint(ejeX, umbral), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
-                        if(eRR) {
+                        /*if(eRR) {
                             RR.appendData(new DataPoint(ejeX,lectura),true,CantidadMuestras);
                             eRR=false;
-                        }
+                        }*/
                         if (Temporizador_contando) ConteoPDF++;
                         if (ConteoPDF == Num*CantidadMuestras) {//If para ir agregando cosas al PDF
                             TiempoFinal = (int) ((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000);
@@ -320,8 +327,6 @@ public class Grafica extends IOIOActivity {
                         }//if (ConteoPDF)
                     }
                 });
-
-
 
                 actualizarTextoGrafica(CantidadPulsos,RC_aprox);
                 //agregarEntradaGrafica(lectura);
@@ -334,7 +339,7 @@ public class Grafica extends IOIOActivity {
         @Override
         public void disconnected() {
             toast("¡IOIO se ha desconectado!");
-            scanner.close();
+            //scanner.close();
             //EntradaAnalogica.close();
         }
 
@@ -558,6 +563,10 @@ public class Grafica extends IOIOActivity {
     private int i_n=1;
     private Paint ColorNegro = new Paint();
 
+    File filepath = Environment.getExternalStorageDirectory();
+    File dir = new File(filepath.getAbsolutePath() + "/PDF_ECG/");
+    File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
+
     private void AgregarDatosPDF(final int A, final int B) {
         //Obtener imagen
         Imagen = CapturarGrafica();
@@ -606,15 +615,21 @@ public class Grafica extends IOIOActivity {
         if(Datos.getBoolean("masculino",false)) txt_Genero="Masculino";
 
         int HR_max_aprox = (int) Math.round(60.0/(HRV_max/1000.0));
-        int HR_mix_aprox = (int) Math.round(60.0/(HRV_min/1000.0));
+        int HR_min_aprox = (int) Math.round(60.0/(HRV_min/1000.0));
         int HR_avg_aprox = (int) Math.round(60.0/(HRV_avg/1000.0));
 
-        String HRVmax = HRV_max+" ms ("+HR_max_aprox+" bpm)";
-        String HRVmin = HRV_min+" ms ("+HR_mix_aprox+" bpm)";
-        String HRVavg = HRV_avg+" ms ("+HR_avg_aprox+" bpm)";
+        String HRVmax = HR_max_aprox+" bpm ("+HRV_max+" ms)";
+        String HRVmin = HR_min_aprox+" bpm ("+HRV_min+" ms)";
+        String HRVavg = HR_avg_aprox+" bpm ("+HRV_avg+" ms)";
 
-        String HRV_txt= "Max: "+HRVmax+",   Min: "+HRVmin+",    Prom: "+HRVavg;
-
+        String diagnostico;
+        if(CantidadPulsos>100) {
+            diagnostico = "Taquicardia";
+        } else if(CantidadPulsos<60) {
+            diagnostico = "Bradicardia";
+        } else {
+            diagnostico = "Frecuencia cardíaca normal";
+        }
         //Finaliza la pagina anterior
         document.finishPage(page);
 
@@ -637,18 +652,22 @@ public class Grafica extends IOIOActivity {
         EspacioTexto+=25;//Salto de linea
         PaginaCanvas.drawText("Frecuencia cardiaca: "+CantidadPulsos+" bpm", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
+        PaginaCanvas.drawText("Diagnóstico: "+diagnostico, MargenLateral, EspacioTexto, ColorNegro);
+        EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Variabilidad de frecuencia cardiaca: ", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
-        PaginaCanvas.drawText(HRV_txt, MargenLateral+5, EspacioTexto, ColorNegro);
+        PaginaCanvas.drawText("Max: "+HRVmin, MargenLateral+7, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
-        PaginaCanvas.drawText("Cantidad de muestras HRV: "+HRV_Count, MargenLateral, EspacioTexto, ColorNegro);
+        PaginaCanvas.drawText("Min: "+HRVmax, MargenLateral+7, EspacioTexto, ColorNegro);
+        EspacioTexto+=15;//Salto de linea
+        PaginaCanvas.drawText("Prom: "+HRVavg, MargenLateral+7, EspacioTexto, ColorNegro);
+        //EspacioTexto+=15;//Salto de linea
+        //PaginaCanvas.drawText("Cantidad de muestras HRV: "+HRV_Count, MargenLateral, EspacioTexto, ColorNegro);
 
         document.finishPage(page);
 
-        File filepath = Environment.getExternalStorageDirectory();
-        File dir = new File(filepath.getAbsolutePath() + "/PDF_Pruebas/");
-        if (!dir.exists()) dir.mkdir();//Si el directorio no existe, crearlo.
-        File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
+        //Si el directorio no existe, crearlo.
+        if (!dir.exists()) dir.mkdir();
 
         try {
             outputStream = new FileOutputStream(file);
@@ -663,13 +682,14 @@ public class Grafica extends IOIOActivity {
 
         toast("Ducumento guardado en "+dir.getAbsolutePath()+" como "+file.getName());
         BotonGuardar.setVisibility(View.INVISIBLE);
+        BotonCompartir.setVisibility(View.VISIBLE);
     }
     private Bitmap CapturarGrafica() {
         final Bitmap Captura = Bitmap.createBitmap(Grafica.getWidth(), Grafica.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas Img = new Canvas(Captura);
         Grafica.draw(Img);
 
-        runOnUiThread(new Runnable() {
+        /*runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 File directorio = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
@@ -685,12 +705,40 @@ public class Grafica extends IOIOActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                Captura.setDensity(1100);
+
             }
-        });
+        });*/
 
-
+        Captura.setDensity(1100);
         return Captura;
+    }
+    public void Compartir(View view)  {
+        //Después de guardar el archivo en el dispositivo
+
+        /*Uri uri = Uri.fromFile(file);
+        Intent share = new Intent();
+        share.setAction(Intent.ACTION_SEND);
+        share.setType("application/pdf");
+        share.putExtra(Intent.EXTRA_SUBJECT,file.getName());
+        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        share.putExtra(Intent.EXTRA_STREAM, uri);
+        startActivity(Intent.createChooser(share,"Compartir"));
+
+        BotonCompartir.setVisibility(View.INVISIBLE);*/
+
+
+        //Exportando - Compartiendo
+        Context context = getApplicationContext();
+        Uri path = FileProvider.getUriForFile(context, "com.dye.heartratebyecg.fileprovider", file);
+        Intent fileIntent = new Intent(Intent.ACTION_SEND);
+        fileIntent.setType("application/pdf");
+        fileIntent.putExtra(Intent.EXTRA_SUBJECT, "PDF");
+        fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        fileIntent.putExtra(Intent.EXTRA_STREAM, path);
+        startActivity(Intent.createChooser(fileIntent, "Compartir"));
+
+        //BotonCompartir.setVisibility(View.INVISIBLE);
+
     }
     /*---------------------------------------------------------------------------*/
 

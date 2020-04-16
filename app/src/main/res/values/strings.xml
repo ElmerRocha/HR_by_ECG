@@ -39,6 +39,7 @@
     <string name="txt_Altura">Altura(cm)</string>
     <string name="txt_Peso">Peso(kg)</string>
     <string name="btn_Guardar">Guardar</string>
+    <string name="btn_Compartir">Compartir</string>
 
 
 
