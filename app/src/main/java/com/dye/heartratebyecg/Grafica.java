@@ -8,7 +8,9 @@ import ioio.lib.util.android.IOIOActivity;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -127,7 +129,7 @@ public class Grafica extends IOIOActivity {
     private RadioButton Femenino;
     private RadioButton Masculino;
     /*-----------------------------------------*/
-    boolean eRR;
+    boolean eRR,desconectar;
     int Num = 1;
 
     File dir_ecg = Environment.getExternalStorageDirectory();
@@ -228,7 +230,7 @@ public class Grafica extends IOIOActivity {
         actualizarTextoTemporizador();
     }//Cierra onCreate
 
-
+    private AnalogInput Bateria;
     /**
      * Este es el hilo en el que ocurre toda la actividad IOIO. Se ejecutará
      * cada vez que la aplicación se reanuda y se cancela cuando se detiene.
@@ -238,6 +240,8 @@ public class Grafica extends IOIOActivity {
      */
     class Looper extends BaseIOIOLooper {
         private AnalogInput EntradaAnalogica;
+
+        final int Bateria_PIN=31;
 
         /**
          * Se llama cada vez que se establece una conexión con IOIO.
@@ -249,17 +253,14 @@ public class Grafica extends IOIOActivity {
             toast("¡IOIO se ha conectado!");
             try {
                 EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
+                Bateria = ioio_.openAnalogInput(Bateria_PIN);
                 //803
                 scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_supra.csv"));
                 //cu17
                 //scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_taquiarritmia3.csv"));
             } catch (ConnectionLostException | FileNotFoundException e) {
+                e.printStackTrace();
                 ioio_.disconnect();
-                try {
-                    throw e;
-                } catch (ConnectionLostException | FileNotFoundException ex) {
-                    ex.printStackTrace();
-                }
             }
         }//Cierre setup
 
@@ -279,6 +280,7 @@ public class Grafica extends IOIOActivity {
          */
         @Override
         public void loop() throws InterruptedException, ConnectionLostException {
+            if(desconectar) ioio_.disconnect();
             if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
                 //adc = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
                 //lectura = (alfa*adc) + ((1-alfa)*lectura);
@@ -341,6 +343,7 @@ public class Grafica extends IOIOActivity {
             toast("¡IOIO se ha desconectado!");
             //scanner.close();
             //EntradaAnalogica.close();
+            Bateria.close();
         }
 
     }//Cierra Looper
@@ -653,7 +656,7 @@ public class Grafica extends IOIOActivity {
         PaginaCanvas.drawText("Frecuencia cardiaca: "+CantidadPulsos+" bpm", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Diagnóstico: "+diagnostico, MargenLateral, EspacioTexto, ColorNegro);
-        EspacioTexto+=15;//Salto de linea
+        EspacioTexto+=25;//Salto de linea
         PaginaCanvas.drawText("Variabilidad de frecuencia cardiaca: ", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Max: "+HRVmin, MargenLateral+7, EspacioTexto, ColorNegro);
@@ -743,7 +746,7 @@ public class Grafica extends IOIOActivity {
     /*---------------------------------------------------------------------------*/
 
     /*---------------- Método para guardar datos del usuario ---------------------*/
-    public void BotonGuardar(final View view) {
+    public void BotonGuardar(final View view) throws ConnectionLostException, InterruptedException {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -776,6 +779,34 @@ public class Grafica extends IOIOActivity {
                 }
             }
         });
+        VoltajeBateria();
+    }
+    /*---------------------------------------------------------------------------*/
+
+    /*------------- Método para medir tensión de la batería ---------------------*/
+    private void VoltajeBateria() throws ConnectionLostException, InterruptedException {
+        float VBat = Bateria.getVoltage();
+        String Bat = String.format(Locale.getDefault(),"%.3f", VBat);
+
+        //if(VBat < 2.7) {
+            AlertDialog.Builder alerta = new AlertDialog.Builder(this);
+            alerta.setTitle("Voltaje de batería bajo");
+            alerta.setMessage("Por favor recargue la batería. Vbat:"+Bat+"V");
+            alerta.setCancelable(false);
+            alerta.setPositiveButton("Aceptar", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    desconectar=true;
+                }
+            });
+            alerta.setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override
+                public void onCancel(DialogInterface dialogInterface) {
+                    desconectar=true;
+                }
+            });
+            alerta.create().show();
+        //}
     }
     /*---------------------------------------------------------------------------*/
 
