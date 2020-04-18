@@ -31,7 +31,8 @@
     <string name="titulo6">Segundos</string>
     <string name="BotonCSV">Guardar PDF</string>
     <string name="txt_Datos">Datos del usuario</string>
-    <string name="txt_Nombre">Nombre </string>
+    <string name="txt_Nombre">Nombre</string>
+    <string name="txt_ID">ID(C.C.)</string>
     <string name="txt_Edad">Edad</string>
     <string name="txt_Genero">Género</string>
     <string name="txt_GeneroM">Masculino</string>
@@ -52,9 +53,9 @@
     <string name="f3">Tercer paso</string>
     <string name="f4">Cuarto paso</string>
     <string name="p1">Conecte los cables a los electrodos, verifique que los electrodos se encuentren en buen estado, al no ser así cambie por otros.</string>
-    <string name="p2">Coloque los electrodos en el cuerpo de acuerdo con la figura. Preste con atención los colores, ubiquelo bajo la clavícula del hombro derecho (rojo), bajo la clavícula del hombro izquierdo (amarillo) y en el abdomen inferior derecho (verde). Antes de colocarlos revise que la zona este limpia.</string>
+    <string name="p2">Revise que la zona esté limpia, ahora coloque los electrodos en el cuerpo de acuerdo con la figura. Preste con atención a los colores, primero ubique en el brazo derecho el rojo, luego en brazo izquierdo el amarillo y en el abdomen inferior derecho el verde.</string>
     <string name="p3">Luego de colocarse los electrodos introduzca el plug al jack en la tarjeta ECG. Esta tarjeta le mide la frecuencia cardiaca. </string>
-    <string name="p4">Conecte el cable USB OTG a la tarjeta y al celular, luego verifique que el dispositivo esté conectado. Cuando todo esté conectado accione el switch, este le permite desconectar o encender todo el dispositivo. Dirijase al menú principal y  oprima el botón Gráfica.</string>
+    <string name="p4">Conecte el cable USB OTG a la tarjeta y al celular, luego verifique que el dispositivo esté conectado. Cuando todo esté conectado accione el interruptor, este le permite desconectar o encender todo el dispositivo. Dirijase al menú principal y  oprima el botón Gráfica.</string>
     <string name="tab_text_1">Tab 1</string>
     <string name="tab_text_2">Tab 2</string>
 

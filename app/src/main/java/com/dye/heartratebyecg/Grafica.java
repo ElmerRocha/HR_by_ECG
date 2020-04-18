@@ -27,6 +27,7 @@ import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -57,17 +58,20 @@ import java.util.Scanner;
 
 public class Grafica extends IOIOActivity {
 
+
     /*-------- Variables programables ---------*/
     final int Pin_ECG=46;//Este es el pin de entrada analogico
-    //final long milisegundos = 10;//Este valor es la frecuencia con la que se tomará una muestra analogica
-    //final long milisegundos = 4;//Prueba CSV cu17
-    final long milisegundos = 4;//Prueba CSV 803
-    final int CantidadMuestrasUmbral = 100;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
+    final int Bateria_PIN=31;//Pin analogico para leer la tensión de la batería
+    final long milisegundos = 5;//Este valor es la frecuencia con la que se tomará una muestra analogica
+    //final long milisegundos = 4;//Registro CSV cu17
+    //final long milisegundos = 8;//Registro CSV 803
+    //final long milisegundos = 13;//Registro CSV 16265
+    final int CantidadMuestrasUmbral = 200;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
     final int CantidadMuestras = (int) (6/(milisegundos/1000.0));//Este es el numero de muestras que verá en la grafica
     final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
-    //final int PorcentajeUmbral = 11;//Este valor es lo que se agrega para el umbral
+    //final int PorcentajeUmbral = 16;//Este valor es lo que se agrega para el umbral
     final int PorcentajeUmbral = 30;//Prueba CSV
-    final int QT = 290;//Duración promedio de segmento QT en ms.
+    final int QT = 400;//Duración promedio de segmento QT en ms.
     /*-----------------------------------------*/
 
     /*-------- Variables generales ------------*/
@@ -78,19 +82,43 @@ public class Grafica extends IOIOActivity {
     double umbral=50;
     private int ConteoMuestras=0;//Variable para el promedio que se lleva para calcular el umbral.
     private double RC_aprox=0;
+    boolean eRR;//,desconectar;
+    int Num = 1;
     //Texto
     private String txt_Nombre;
+    private String txt_ID;
     private String txt_Edad;
     private String txt_Altura;
     private String txt_Peso;
     private String txt_Genero;
-    //PDF
+    /*-----------------------------------------*/
+
+    /*------------ Variables PDF --------------*/
+    private int TiempoInicial;
+    private int TiempoFinal;
+    private PdfDocument document = new PdfDocument();
+    private boolean CrearPagina=true;
+    private PdfDocument.PageInfo pageInfo;
+    private PdfDocument.Page page;
+    private Canvas PaginaCanvas;
+    private int EspacioTexto;
+    private int NumPagina=1;
+    private int MargenExterno = 45;//Margen de 2.5 cm = 0.984252'' = 71 P.S.
+    private int MargenLateral = 40;//Margen de 3.0 cm = 1.1811'' = 85 P.S.
+    int AlturaImg = 232;//Altura de las imágenes
+    private int pageWidth = 595;
+    private int pageHeight = 842;
+    private int i_n=1;
+    private Paint ColorNegro = new Paint();
     OutputStream outputStream;
     private int ConteoPDF = 1;
     Bitmap Imagen;
     SimpleDateFormat fecha = new SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault());//Formato de fecha
-    private int TiempoInicial;
-    private int TiempoFinal;
+
+    File filepath = Environment.getExternalStorageDirectory();
+    File dir = new File(filepath.getAbsolutePath() + "/PDF_ECG/");
+    //File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
+    File file = new File(dir, "rB16265_"+fecha.format(new Date())+".pdf");
     /*-----------------------------------------*/
 
     /*-------- Variables temporizador ---------*/
@@ -122,6 +150,7 @@ public class Grafica extends IOIOActivity {
     private ScrollView Layout2;
     //EditText
     private EditText Nombre;
+    private EditText ID;
     private EditText Edad;
     private EditText Altura;
     private EditText Peso;
@@ -129,28 +158,186 @@ public class Grafica extends IOIOActivity {
     private RadioButton Femenino;
     private RadioButton Masculino;
     /*-----------------------------------------*/
-    boolean eRR,desconectar;
-    int Num = 1;
 
+    /*------------ Variables HRV --------------*/
+    List<Integer> HRV = new ArrayList<>();
+    int HRV_tmp=0;
+    private int HRV_max,HRV_min,HRV_avg;
+    private int HRV_Count;
+    /*-----------------------------------------*/
+
+    /*------------- Variables csv -------------*/
     File dir_ecg = Environment.getExternalStorageDirectory();
     Scanner scanner;
+    /*-----------------------------------------*/
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //Aceleracion de Hardware para la gráfica con GraphView
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
         setContentView(R.layout.activity_grafica);
 
+        //Solicitud de permisos de escritura y lectura
+        pedirPermisos();
 
-        /*------- Permisos para escritura, lectura y Bluetooth --------*/
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},1000);
-        } if( ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE},1000);
-        } if( ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH},1000);
+        //Asociar Views con variables del sistema
+        asociarViews();
+
+        //Poner los datos de Sharedpreferences
+        cargardatosSharedPreferences();
+        //Ajustar GrapView
+        personalizarGrapView();
+
+        //Iniciar el temporizador
+        actualizarTextoTemporizador();
+    }//Cierra onCreate
+
+    private AnalogInput Bateria;
+    /**
+     * Este es el hilo en el que ocurre toda la actividad IOIO. Se ejecutará
+     * cada vez que la aplicación se reanuda y se cancela cuando se detiene.
+     * Lo que esté en método setup() se llamará inmediatamente después de que se haya establecido una conexión con IOIO
+     * Esto puede suceder varias veces. Entonces, loop() será llamada repetidamente hasta que el IOIO se desconecte.
+     * Igual que en Arduino.
+     */
+    class Looper extends BaseIOIOLooper {
+        private AnalogInput EntradaAnalogica;
+
+        /**
+         * Se llama cada vez que se establece una conexión con IOIO.
+         * Normalmente se usa para abrir pines.
+         * Se lanza ConnectionLostException cuando se pierde la conexión IOIO.
+         */
+        @Override
+        protected void setup() {
+            toast("¡IOIO se ha conectado!");
+            try {
+                EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
+                //Bateria = ioio_.openAnalogInput(Bateria_PIN);
+                //803
+                //scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_supra.csv"));
+                //cu17
+                //scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_taquiarritmia3.csv"));
+                //r16265
+                //scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_normal.csv"));
+            } catch (ConnectionLostException e) {
+                e.printStackTrace();
+            }
+        }//Cierre setup
+
+        //Variables
+        long T1, T2;
+        double RC_prom;
+        double RC_temp;
+        int cant = 10;
+        double alfa = 0.55;
+        double lectura,adc;
+        long TiempoA,TiempoB,T_RR;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
+        /**
+         * Llamado repetidamente mientras el IOIO está conectado.
+         * En este método se programa lo que quiere que la tarjeta haga durante su ejecución.
+         * Lanza ConnectionLostException cuando se pierde la conexión IOIO.
+         * Lanza InterruptedException cuando el hilo IOIO ha sido interrumpido.
+         */
+        @Override
+        public void loop() throws ConnectionLostException, InterruptedException {//throws InterruptedException, ConnectionLostException {
+            //if(desconectar) ioio_.disconnect();
+            try {
+                if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
+                    //adc = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
+                    //adc = EntradaAnalogica.getVoltage();
+                    //lectura = (alfa*adc) + ((1-alfa)*lectura);
+                    //lectura = lectura + alfa*(adc-lectura);
+                    //alfa = Math.pow(2,-alfa);
+                    lectura = Float.parseFloat(scanner.nextLine());//Para leer los datos del archivo .csv
+                    umbral = promedioUmbral(lectura);
+                    //umbral = CalculoUmbral(lectura);
+
+                    if (lectura > umbral) {
+                        T1 = T2;
+                        T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
+                        //Este if  detecta una onda R
+                        if ( (T2-T1)> QT ) {//400 ms porque es el promedio de duración del segmento QT
+                            TiempoA = TiempoB;
+                            TiempoB = SystemClock.elapsedRealtime();
+                            T_RR = TiempoB-TiempoA;
+                            RC_temp = 60.0 / (T_RR/1000.0);//Se divide en 1k para que la medida quede en segundos.
+                            RC_prom = RC_prom + RC_temp;
+                            if(conteo>=cant) {
+                                RC_aprox = RC_prom / cant;
+                                conteo = 1;
+                                RC_prom = 0;
+                            } else conteo++;
+                            if (Temporizador_contando) {
+                                CantidadPulsos++;
+                                CalculoHRV((int)(T_RR), false);
+                            }
+                            //eRR=true;
+                        }//If(T2-T1)
+                    }//If(lectura>umbral)
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            series.appendData(new DataPoint(ejeX++, lectura), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
+                            //Lumb.appendData(new DataPoint(ejeX, umbral), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
+                        /*if(eRR) {
+                            RR.appendData(new DataPoint(ejeX,lectura),true,CantidadMuestras);
+                            eRR=false;
+                        }*/
+                            if (Temporizador_contando) ConteoPDF++;
+                            if (ConteoPDF == Num*CantidadMuestras) {//If para ir agregando cosas al PDF
+                                TiempoFinal = (int) ((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000);
+                                if (TiempoInicial != TiempoFinal) AgregarDatosPDF(TiempoInicial, TiempoFinal);
+                                TiempoInicial = TiempoFinal;
+                                Num++;
+                            }//if (ConteoPDF)
+                        }
+                    });
+
+                    actualizarTextoGrafica(CantidadPulsos,RC_aprox);
+                    //agregarEntradaGrafica(lectura);
+
+                    Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
+                }//If(graficando)
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }//Cierre loop
+        //Método para mostrar cuando se desconecta IOIO
+        @Override
+        public void disconnected() {
+            toast("¡IOIO se ha desconectado!");
+            //scanner.close();
+            //EntradaAnalogica.close();
+            //Bateria.close();
         }
-        /*--------------------------------------------------------------*/
 
+    }//Cierra Looper
+    /*----------------------------- Métodos de IOIO -----------------------------*/
+    @Override//El metodo para crear el hilo IOIO
+    protected IOIOLooper createIOIOLooper() {
+        return new Looper();
+    }
+    //Metodo para imprimir mensajes en el celular tipo Toast, emergente.
+    private void toast(final String mensaje) {
+        final Context contexto = this;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+    /*--------------------------------------------------------------------------*/
+
+    /*--------------------- Método de asociación de Views ----------------------*/
+    private void asociarViews() {
         /*--- Asociar las variables de Views con las views de la GUI ---*/
         //Texto
         TextoPulsos = findViewById(R.id.tv_Pulsos);
@@ -169,6 +356,7 @@ public class Grafica extends IOIOActivity {
         Edad = findViewById(R.id.et_edad);
         Altura = findViewById(R.id.et_altura);
         Peso = findViewById(R.id.et_peso);
+        ID = findViewById(R.id.et_ID);
         //RadioButtons
         Femenino = findViewById(R.id.rb_F);
         Masculino = findViewById(R.id.rb_M);
@@ -176,191 +364,20 @@ public class Grafica extends IOIOActivity {
         Layout1 = findViewById(R.id.Layout1);
         Layout2 = findViewById(R.id.Layout2);
         /*--------------------------------------------------------------*/
-
-        /*------------------- Shared Preferences -----------------------*/
-        SharedPreferences preferences = getSharedPreferences("datos", Context.MODE_PRIVATE);
-        Nombre.setText(preferences.getString("nombre", ""));
-        Edad.setText(preferences.getString("edad", ""));
-        Altura.setText(preferences.getString("altura", ""));
-        Peso.setText(preferences.getString("peso", ""));
-        Femenino.setChecked(preferences.getBoolean("femenino",false));
-        Masculino.setChecked(preferences.getBoolean("masculino",false));
-        /*--------------------------------------------------------------*/
-
-        /*---------- GraphView y personalización de la gráfica ---------*/
-        //series = new LineGraphSeries<DataPoint>();
-        series = new LineGraphSeries<>();
-        RR = new PointsGraphSeries<>();
-        Lumb = new LineGraphSeries<>();
-        Grafica.addSeries(series);
-        Grafica.addSeries(RR);
-        Grafica.addSeries(Lumb);
-        Lumb.setColor(Color.GREEN);
-        RR.setColor(Color.RED);
-        RR.setSize(8f);
-
-        Viewport Grid = Grafica.getViewport();
-        GridLabelRenderer Label = Grafica.getGridLabelRenderer();
-
-        Grid.setXAxisBoundsManual(true);
-        Grid.setYAxisBoundsManual(true);
-        Grid.setMinX(0.0001);
-        Grid.setMinY(0.0001);
-        Grid.setMaxX(CantidadMuestras);
-        Grid.setMaxY(multiplicador+0.0001);
-        Grid.setScrollable(false);
-        Grid.setScalable(false);
-
-        Label.reloadStyles();
-        Label.setGridColor(getResources().getColor(R.color.BlancoTransparente));
-        Grid.setDrawBorder(true);
-
-        Label.setHumanRounding(false,false);
-        Label.setNumHorizontalLabels(151);
-        Label.setNumVerticalLabels(101);
-        Label.setVerticalLabelsVisible(false);
-        Label.setHorizontalLabelsVisible(false);
-        /*--------------------------------------------------------------*/
-
-        //Aceleracion de Hardware para la gráfica con GraphView
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
-
-        //Iniciar el temporizador
-        actualizarTextoTemporizador();
-    }//Cierra onCreate
-
-    private AnalogInput Bateria;
-    /**
-     * Este es el hilo en el que ocurre toda la actividad IOIO. Se ejecutará
-     * cada vez que la aplicación se reanuda y se cancela cuando se detiene.
-     * Lo que esté en método setup() se llamará inmediatamente después de que se haya establecido una conexión con IOIO
-     * Esto puede suceder varias veces. Entonces, loop() será llamada repetidamente hasta que el IOIO se desconecte.
-     * Igual que en Arduino.
-     */
-    class Looper extends BaseIOIOLooper {
-        private AnalogInput EntradaAnalogica;
-
-        final int Bateria_PIN=31;
-
-        /**
-         * Se llama cada vez que se establece una conexión con IOIO.
-         * Normalmente se usa para abrir pines.
-         * Se lanza ConnectionLostException cuando se pierde la conexión IOIO.
-         */
-        @Override
-        protected void setup() {//throws ConnectionLostException {
-            toast("¡IOIO se ha conectado!");
-            try {
-                EntradaAnalogica = ioio_.openAnalogInput(Pin_ECG);
-                Bateria = ioio_.openAnalogInput(Bateria_PIN);
-                //803
-                scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_supra.csv"));
-                //cu17
-                //scanner = new Scanner(new File(dir_ecg.getAbsolutePath() + "/ECG/ecg_taquiarritmia3.csv"));
-            } catch (ConnectionLostException | FileNotFoundException e) {
-                e.printStackTrace();
-                ioio_.disconnect();
-            }
-        }//Cierre setup
-
-        //Variables
-        long T1, T2;
-        double RC_prom;
-        double RC_temp;
-        int cant = 10;
-        double alfa = 0.45;
-        double lectura,adc;
-        long TiempoA,TiempoB,T_RR;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
-        /**
-         * Llamado repetidamente mientras el IOIO está conectado.
-         * En este método se programa lo que quiere que la tarjeta haga durante su ejecución.
-         * Lanza ConnectionLostException cuando se pierde la conexión IOIO.
-         * Lanza InterruptedException cuando el hilo IOIO ha sido interrumpido.
-         */
-        @Override
-        public void loop() throws InterruptedException, ConnectionLostException {
-            if(desconectar) ioio_.disconnect();
-            if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
-                //adc = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
-                //lectura = (alfa*adc) + ((1-alfa)*lectura);
-                lectura = Float.parseFloat(scanner.nextLine());//Para leer los datos del archivo .csv
-                umbral = promedioUmbral(lectura);
-                //umbral = CalculoUmbral(lectura);
-
-                if (lectura > umbral) {
-                    T1 = T2;
-                    T2 = SystemClock.elapsedRealtime();//Devuelve el tiempo actual del reloj en milisegundos.
-                    //Este if  detecta una onda R
-                    if ( (T2-T1)> QT ) {//400 ms porque es el promedio de duración del segmento QT
-                        TiempoA = TiempoB;
-                        TiempoB = SystemClock.elapsedRealtime();
-                        T_RR = TiempoB-TiempoA;
-                        RC_temp = 60.0 / (T_RR/1000.0);//Se divide en 1k para que la medida quede en segundos.
-                        RC_prom = RC_prom + RC_temp;
-                        if(conteo>=cant) {
-                            RC_aprox = RC_prom / cant;
-                            conteo = 1;
-                            RC_prom = 0;
-                        } else conteo++;
-                        if (Temporizador_contando) {
-                            CantidadPulsos++;
-                            CalculoHRV((int)(T_RR), false);
-                        }
-                        //eRR=true;
-                    }//If(T2-T1)
-                }//If(lectura>umbral)
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        series.appendData(new DataPoint(ejeX++, lectura), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
-                        //Lumb.appendData(new DataPoint(ejeX, umbral), true, CantidadMuestras);//ejeX va aumentando cada que se agrega un dato.
-                        /*if(eRR) {
-                            RR.appendData(new DataPoint(ejeX,lectura),true,CantidadMuestras);
-                            eRR=false;
-                        }*/
-                        if (Temporizador_contando) ConteoPDF++;
-                        if (ConteoPDF == Num*CantidadMuestras) {//If para ir agregando cosas al PDF
-                            TiempoFinal = (int) ((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000);
-                            if (TiempoInicial != TiempoFinal) AgregarDatosPDF(TiempoInicial, TiempoFinal);
-                            TiempoInicial = TiempoFinal;
-                            Num++;
-                        }//if (ConteoPDF)
-                    }
-                });
-
-                actualizarTextoGrafica(CantidadPulsos,RC_aprox);
-                //agregarEntradaGrafica(lectura);
-
-                Thread.sleep(milisegundos);//Aqui se hace un delay para que haga la lectura con una frecuencia especifica.
-            }//If(graficando)
-
-        }//Cierre loop
-        //Método para mostrar cuando se desconecta IOIO
-        @Override
-        public void disconnected() {
-            toast("¡IOIO se ha desconectado!");
-            //scanner.close();
-            //EntradaAnalogica.close();
-            Bateria.close();
-        }
-
-    }//Cierra Looper
-    /*----------------------------- Métodos de IOIO -----------------------------*/
-    @Override//El metodo para crear el hilo IOIO
-    protected IOIOLooper createIOIOLooper() {
-        return new Looper();
     }
-    //Metodo para imprimir mensajes en el celular tipo Toast, emergente.
-    private void toast(final String mensaje) {
-        final Context contexto = this;
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(contexto, mensaje, Toast.LENGTH_LONG).show();
-            }
-        });
+    /*--------------------------------------------------------------------------*/
+
+    /*--------------- Método de permisos para escribir y leer ------------------*/
+    private void pedirPermisos() {
+        /*------- Permisos para escritura, lectura y Bluetooth --------*/
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},1000);
+        } if( ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE},1000);
+        }/* if( ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH},1000);
+        }*/
+        /*--------------------------------------------------------------*/
     }
     /*--------------------------------------------------------------------------*/
 
@@ -408,7 +425,7 @@ public class Grafica extends IOIOActivity {
                 BotonReset.setVisibility(View.VISIBLE);
 
                 Graficando=false;
-                //ConteoPDF = 0;
+                ConteoPDF = 0;
 
                 TiempoFinal = (int) ((TiempoInicialTemporizador - TiempoEnMilisegundos) / 1000);
                 if (TiempoInicial != TiempoFinal) AgregarDatosPDF(TiempoInicial, TiempoFinal);
@@ -438,6 +455,10 @@ public class Grafica extends IOIOActivity {
         actualizarTextoTemporizador();
 
         BotonGuardar.setVisibility(View.INVISIBLE);
+
+        document.finishPage(page);
+        document.close();
+        document = new PdfDocument();
     }
     private void actualizarTextoTemporizador() {
         runOnUiThread(new Runnable() {
@@ -488,10 +509,6 @@ public class Grafica extends IOIOActivity {
     /*---------------------------------------------------------------------------*/
 
     /*---------------------- Método para encontrar HRV --------------------------*/
-    List<Integer> HRV = new ArrayList<>();
-    int HRV_tmp=0;
-    private int HRV_max,HRV_min,HRV_avg;
-    private int HRV_Count;
     private void CalculoHRV(final int TRR, final boolean bool) {
         runOnUiThread(new Runnable() {
             @Override
@@ -548,28 +565,46 @@ public class Grafica extends IOIOActivity {
         });
 
     }
+    private void personalizarGrapView() {
+        /*---------- GraphView y personalización de la gráfica ---------*/
+        //series = new LineGraphSeries<DataPoint>();
+        series = new LineGraphSeries<>();
+        RR = new PointsGraphSeries<>();
+        Lumb = new LineGraphSeries<>();
+        Grafica.addSeries(series);
+        Grafica.addSeries(RR);
+        Grafica.addSeries(Lumb);
+        Lumb.setColor(Color.GREEN);
+        RR.setColor(Color.RED);
+        RR.setSize(8f);
+
+        Viewport Grid = Grafica.getViewport();
+        GridLabelRenderer Label = Grafica.getGridLabelRenderer();
+
+        Grid.setXAxisBoundsManual(true);
+        Grid.setYAxisBoundsManual(true);
+        Grid.setMinX(0.0001);
+        Grid.setMinY(0.0001);
+        Grid.setMaxX(CantidadMuestras);
+        //Grid.setMaxY(3.3+0.0001);//Para lectura analógica
+        Grid.setMaxY(multiplicador+0.0001);//Para csv
+        Grid.setScrollable(false);
+        Grid.setScalable(false);
+
+        Label.reloadStyles();
+        Label.setGridColor(getResources().getColor(R.color.BlancoTransparente));
+        Grid.setDrawBorder(true);
+
+        Label.setHumanRounding(false,false);
+        Label.setNumHorizontalLabels(151);
+        Label.setNumVerticalLabels(101);
+        Label.setVerticalLabelsVisible(false);
+        Label.setHorizontalLabelsVisible(false);
+        /*--------------------------------------------------------------*/
+    }
     /*---------------------------------------------------------------------------*/
 
     /*------------ Metodos de creación y exportación del documento --------------*/
-    private PdfDocument document = new PdfDocument();
-    private boolean CrearPagina=true;
-    private PdfDocument.PageInfo pageInfo;
-    private PdfDocument.Page page;
-    private Canvas PaginaCanvas;
-    private int EspacioTexto;
-    private int NumPagina=1;
-    private int MargenExterno = 45;//Margen de 2.5 cm = 0.984252'' = 71 P.S.
-    private int MargenLateral = 40;//Margen de 3.0 cm = 1.1811'' = 85 P.S.
-    int AlturaImg = 232;//Altura de las imágenes
-    private int pageWidth = 595;
-    private int pageHeight = 842;
-    private int i_n=1;
-    private Paint ColorNegro = new Paint();
-
-    File filepath = Environment.getExternalStorageDirectory();
-    File dir = new File(filepath.getAbsolutePath() + "/PDF_ECG/");
-    File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
-
     private void AgregarDatosPDF(final int A, final int B) {
         //Obtener imagen
         Imagen = CapturarGrafica();
@@ -610,6 +645,7 @@ public class Grafica extends IOIOActivity {
     public void GuardarPDF(View view) {
         SharedPreferences Datos = getSharedPreferences("datos", Context.MODE_PRIVATE);
         txt_Nombre = Datos.getString("nombre", "");
+        txt_ID = Datos.getString("ID","");
         txt_Edad = Datos.getString("edad", "");
         txt_Altura = Datos.getString("altura", "");
         txt_Peso = Datos.getString("peso", "");
@@ -643,17 +679,24 @@ public class Grafica extends IOIOActivity {
         EspacioTexto = MargenExterno;
 
         //Agregar texto
-        PaginaCanvas.drawText("Resultados:", MargenLateral, EspacioTexto, ColorNegro);
+        PaginaCanvas.drawText("Información del usuario:", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=25;//Salto de linea
         PaginaCanvas.drawText("Nombre: "+txt_Nombre, MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
+        PaginaCanvas.drawText("Identificación: "+txt_ID, MargenLateral, EspacioTexto, ColorNegro);
+        EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Edad: "+txt_Edad+" años", MargenLateral, EspacioTexto, ColorNegro);
-        PaginaCanvas.drawText("Género: "+txt_Genero, MargenLateral+95, EspacioTexto, ColorNegro);
+        EspacioTexto+=15;//Salto de linea
+        PaginaCanvas.drawText("Género: "+txt_Genero, MargenLateral, EspacioTexto, ColorNegro);
+        //PaginaCanvas.drawText("Género: Desconocido", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Altura: "+txt_Altura+" cm", MargenLateral, EspacioTexto, ColorNegro);
-        PaginaCanvas.drawText("Peso: "+txt_Peso+" kg", MargenLateral+95, EspacioTexto, ColorNegro);
+        EspacioTexto+=15;//Salto de linea
+        PaginaCanvas.drawText("Peso: "+txt_Peso+" kg", MargenLateral, EspacioTexto, ColorNegro);
+        EspacioTexto+=50;//Salto de linea
+        PaginaCanvas.drawText("Resultados de la medición:", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=25;//Salto de linea
-        PaginaCanvas.drawText("Frecuencia cardiaca: "+CantidadPulsos+" bpm", MargenLateral, EspacioTexto, ColorNegro);
+        PaginaCanvas.drawText("RC protocolo clínico: "+CantidadPulsos+" bpm", MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Diagnóstico: "+diagnostico, MargenLateral, EspacioTexto, ColorNegro);
         EspacioTexto+=25;//Salto de linea
@@ -663,7 +706,7 @@ public class Grafica extends IOIOActivity {
         EspacioTexto+=15;//Salto de linea
         PaginaCanvas.drawText("Min: "+HRVmax, MargenLateral+7, EspacioTexto, ColorNegro);
         EspacioTexto+=15;//Salto de linea
-        PaginaCanvas.drawText("Prom: "+HRVavg, MargenLateral+7, EspacioTexto, ColorNegro);
+        PaginaCanvas.drawText("RC por VFC: "+HRVavg, MargenLateral+7, EspacioTexto, ColorNegro);
         //EspacioTexto+=15;//Salto de linea
         //PaginaCanvas.drawText("Cantidad de muestras HRV: "+HRV_Count, MargenLateral, EspacioTexto, ColorNegro);
 
@@ -751,6 +794,7 @@ public class Grafica extends IOIOActivity {
             @Override
             public void run() {
                 txt_Nombre = Nombre.getText().toString();
+                txt_ID = ID.getText().toString();
                 txt_Edad = Edad.getText().toString();
                 txt_Altura = Altura.getText().toString();
                 txt_Peso = Peso.getText().toString();
@@ -759,13 +803,14 @@ public class Grafica extends IOIOActivity {
                 if(Masculino.isChecked()) txt_Genero="Masculino";
 
                 if(txt_Nombre.isEmpty() || txt_Edad.isEmpty() || txt_Altura.isEmpty() ||
-                        txt_Peso.isEmpty() || txt_Genero.isEmpty()) {//(RGenero.getCheckedRadioButtonId() == -1)) {
+                        txt_Peso.isEmpty() || txt_Genero.isEmpty() || txt_ID.isEmpty()) {//(RGenero.getCheckedRadioButtonId() == -1)) {
                     toast("Por favor rellene todos los datos.");
                 } else {
 
                     SharedPreferences pref = getSharedPreferences("datos", Context.MODE_PRIVATE);
                     SharedPreferences.Editor editor = pref.edit();
                     editor.putString("nombre", txt_Nombre);
+                    editor.putString("ID",txt_ID);
                     editor.putString("edad", txt_Edad);
                     editor.putString("altura",txt_Altura);
                     editor.putString("peso", txt_Peso);
@@ -779,35 +824,47 @@ public class Grafica extends IOIOActivity {
                 }
             }
         });
-        VoltajeBateria();
+        //VoltajeBateria();
+    }
+    private void cargardatosSharedPreferences() {
+        /*------------------- Shared Preferences -----------------------*/
+        SharedPreferences preferences = getSharedPreferences("datos", Context.MODE_PRIVATE);
+        Nombre.setText(preferences.getString("nombre", ""));
+        ID.setText(preferences.getString("ID",""));
+        Edad.setText(preferences.getString("edad", ""));
+        Altura.setText(preferences.getString("altura", ""));
+        Peso.setText(preferences.getString("peso", ""));
+        Femenino.setChecked(preferences.getBoolean("femenino",false));
+        Masculino.setChecked(preferences.getBoolean("masculino",false));
+        /*--------------------------------------------------------------*/
     }
     /*---------------------------------------------------------------------------*/
 
     /*------------- Método para medir tensión de la batería ---------------------*/
-    private void VoltajeBateria() throws ConnectionLostException, InterruptedException {
-        float VBat = Bateria.getVoltage();
-        String Bat = String.format(Locale.getDefault(),"%.3f", VBat);
-
-        //if(VBat < 2.7) {
-            AlertDialog.Builder alerta = new AlertDialog.Builder(this);
-            alerta.setTitle("Voltaje de batería bajo");
-            alerta.setMessage("Por favor recargue la batería. Vbat:"+Bat+"V");
-            alerta.setCancelable(false);
-            alerta.setPositiveButton("Aceptar", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    desconectar=true;
-                }
-            });
-            alerta.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                @Override
-                public void onCancel(DialogInterface dialogInterface) {
-                    desconectar=true;
-                }
-            });
-            alerta.create().show();
-        //}
-    }
+//    private void VoltajeBateria() throws ConnectionLostException, InterruptedException {
+//        float VBat = Bateria.getVoltage();
+//        String Bat = String.format(Locale.getDefault(),"%.3f", VBat);
+//
+//        //if(VBat < 2.7) {
+//            AlertDialog.Builder alerta = new AlertDialog.Builder(this);
+//            alerta.setTitle("Voltaje de batería bajo");
+//            alerta.setMessage("Por favor recargue la batería. Vbat:"+Bat+"V");
+//            alerta.setCancelable(false);
+//            alerta.setPositiveButton("Aceptar", new DialogInterface.OnClickListener() {
+//                @Override
+//                public void onClick(DialogInterface dialogInterface, int i) {
+//                    desconectar=true;
+//                }
+//            });
+//            alerta.setOnCancelListener(new DialogInterface.OnCancelListener() {
+//                @Override
+//                public void onCancel(DialogInterface dialogInterface) {
+//                    desconectar=true;
+//                }
+//            });
+//            alerta.create().show();
+//        //}
+//    }
     /*---------------------------------------------------------------------------*/
 
 }//Cierra Grafica

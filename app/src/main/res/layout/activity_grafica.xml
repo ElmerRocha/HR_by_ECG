@@ -69,6 +69,32 @@
                     android:layout_height="match_parent">
 
                     <TextView
+                        android:id="@+id/tv_ID"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/txt_ID"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+
+                    <EditText
+                        android:layout_marginStart="5dp"
+                        android:id="@+id/et_ID"
+                        android:importantForAutofill="no"
+                        tools:ignore="Autofill"
+                        android:hint="@string/txt_ID"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ems="15"
+                        android:inputType="number"
+                        android:textColor="@color/Blanco"
+                        android:textSize="18sp" />
+                </TableRow>
+
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <TextView
                         android:id="@+id/tv_edad"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
