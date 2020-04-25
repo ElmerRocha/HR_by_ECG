@@ -69,8 +69,8 @@ public class Grafica extends IOIOActivity {
     final int CantidadMuestrasUmbral = 200;//Es el numero de muestras que se tiene en cuenta para calcular el umbral.
     final int CantidadMuestras = (int) (6/(milisegundos/1000.0));//Este es el numero de muestras que verá en la grafica
     final int multiplicador = 100;//Este valor es con el normalizará la lectura analogica
-    //final int PorcentajeUmbral = 16;//Este valor es lo que se agrega para el umbral
-    final int PorcentajeUmbral = 30;//Prueba CSV
+    final int PorcentajeUmbral = 14;//Este valor es lo que se agrega para el umbral
+    //final int PorcentajeUmbral = 30;//Prueba CSV
     final int QT = 400;//Duración promedio de segmento QT en ms.
     /*-----------------------------------------*/
 
@@ -118,7 +118,7 @@ public class Grafica extends IOIOActivity {
     File filepath = Environment.getExternalStorageDirectory();
     File dir = new File(filepath.getAbsolutePath() + "/PDF_ECG/");
     //File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
-    File file = new File(dir, "rB16265_"+fecha.format(new Date())+".pdf");
+    File file = new File(dir, "ECG_"+fecha.format(new Date())+".pdf");
     /*-----------------------------------------*/
 
     /*-------- Variables temporizador ---------*/
@@ -167,8 +167,8 @@ public class Grafica extends IOIOActivity {
     /*-----------------------------------------*/
 
     /*------------- Variables csv -------------*/
-    File dir_ecg = Environment.getExternalStorageDirectory();
-    Scanner scanner;
+    //File dir_ecg = Environment.getExternalStorageDirectory();
+    //Scanner scanner;
     /*-----------------------------------------*/
 
 
@@ -233,7 +233,7 @@ public class Grafica extends IOIOActivity {
         double RC_prom;
         double RC_temp;
         int cant = 10;
-        double alfa = 0.55;
+        double alfa = 0.35;
         double lectura,adc;
         long TiempoA,TiempoB,T_RR;//Variables para calcular la variabilidad de la frecuencia "el tiempo entre ondas R"
         /**
@@ -248,11 +248,11 @@ public class Grafica extends IOIOActivity {
             try {
                 if(Graficando) {//Se revisa la bandera, para saber si se está o no graficando
                     //adc = multiplicador * EntradaAnalogica.read();//Lectura analogica guardada en "lectura"
-                    //adc = EntradaAnalogica.getVoltage();
+                    adc = 1.25*EntradaAnalogica.getVoltage();
                     //lectura = (alfa*adc) + ((1-alfa)*lectura);
-                    //lectura = lectura + alfa*(adc-lectura);
+                    lectura = lectura + alfa*(adc-lectura);
                     //alfa = Math.pow(2,-alfa);
-                    lectura = Float.parseFloat(scanner.nextLine());//Para leer los datos del archivo .csv
+                    //lectura = Float.parseFloat(scanner.nextLine());//Para leer los datos del archivo .csv
                     umbral = promedioUmbral(lectura);
                     //umbral = CalculoUmbral(lectura);
 
@@ -266,6 +266,7 @@ public class Grafica extends IOIOActivity {
                             T_RR = TiempoB-TiempoA;
                             RC_temp = 60.0 / (T_RR/1000.0);//Se divide en 1k para que la medida quede en segundos.
                             RC_prom = RC_prom + RC_temp;
+                            lectura+=0.35;//Chanchullo
                             if(conteo>=cant) {
                                 RC_aprox = RC_prom / cant;
                                 conteo = 1;
@@ -586,8 +587,8 @@ public class Grafica extends IOIOActivity {
         Grid.setMinX(0.0001);
         Grid.setMinY(0.0001);
         Grid.setMaxX(CantidadMuestras);
-        //Grid.setMaxY(3.3+0.0001);//Para lectura analógica
-        Grid.setMaxY(multiplicador+0.0001);//Para csv
+        Grid.setMaxY(3.3+0.0001);//Para lectura analógica
+        //Grid.setMaxY(multiplicador+0.0001);//Para csv
         Grid.setScrollable(false);
         Grid.setScalable(false);
 
